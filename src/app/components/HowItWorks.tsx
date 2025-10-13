@@ -18,19 +18,19 @@ export default function HowItWorks() {
   ]
 
   return (
-    <section className="px-6 py-24 border-t border-zinc-900">
+    <section className="px-6 py-24 border-t border-border">
       <div className="max-w-4xl mx-auto">
         <h2 className="text-3xl font-bold mb-12 text-center">How it works</h2>
         
-        <div className="space-y-12">
-          {steps.map((step, i) => (
-            <div key={i} className="flex gap-6 items-start group">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-sm font-mono group-hover:bg-zinc-800 group-hover:border-zinc-700 transition-colors">
+        <div className="space-y-8">
+          {steps.map((step) => (
+            <div key={step.number} className="flex gap-6 items-start">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-bg-secondary border border-border flex items-center justify-center text-sm font-mono">
                 {step.number}
               </div>
-              <div className="pt-1">
-                <h4 className="font-semibold mb-2 text-lg">{step.title}</h4>
-                <p className="text-zinc-500 leading-relaxed">{step.description}</p>
+              <div>
+                <h4 className="font-semibold mb-1">{step.title}</h4>
+                <p className="text-sm text-text-secondary">{step.description}</p>
               </div>
             </div>
           ))}
