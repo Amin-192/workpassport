@@ -40,7 +40,15 @@ export default function Home() {
           </div>
         </div>
 
-        
+        <div className="absolute inset-0 -z-10 opacity-20">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `
+              linear-gradient(to right, rgb(39 39 42) 1px, transparent 1px),
+              linear-gradient(to bottom, rgb(39 39 42) 1px, transparent 1px)
+            `,
+            backgroundSize: '80px 80px'
+          }} />
+        </div>
       </section>
 
       <Features />
