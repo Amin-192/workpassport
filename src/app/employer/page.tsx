@@ -7,7 +7,60 @@ export default function EmployerPage() {
           <p className="text-text-secondary">Sign work credentials for your employees</p>
         </div>
 
-        
+        <div className="border border-border rounded-xl p-8">
+          <form className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">Worker Address</label>
+              <input 
+                type="text"
+                placeholder="0x..."
+                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Position</label>
+              <input 
+                type="text"
+                placeholder="Senior Developer"
+                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Start Date</label>
+                <input 
+                  type="date"
+                  className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">End Date</label>
+                <input 
+                  type="date"
+                  className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Skills (comma separated)</label>
+              <input 
+                type="text"
+                placeholder="React, Node.js, Solidity"
+                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+              />
+            </div>
+
+            <button 
+              type="submit"
+              className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors"
+            >
+              Sign & Issue Credential
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
