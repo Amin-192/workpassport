@@ -1,11 +1,2 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --bg-primary: 10 10 10;
-    --bg-secondary: 24 24 27;
-    --border: 39 39 42;
-    --text-primary: 250 250 250;
-    --text-secondary: 161 161 170;
-  }
-}
