@@ -22,7 +22,17 @@ export default function WorkerPage() {
           </div>
         </div>
 
-       
+        <div className="border border-border rounded-xl p-8 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold mb-1">Connect GitHub</h3>
+              <p className="text-sm text-text-secondary">Import your contribution history automatically</p>
+            </div>
+            <button className="px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors">
+              Connect
+            </button>
+          </div>
+        </div>
 
         <div className="border border-border rounded-xl p-12 text-center">
           <div className="text-4xl mb-4">📋</div>
