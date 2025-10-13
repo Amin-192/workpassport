@@ -22,7 +22,7 @@ export default function WalletConnect() {
   return (
     <button 
       onClick={connectWallet}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-white/90 transition-colors"
     >
       {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Connect Wallet'}
     </button>
