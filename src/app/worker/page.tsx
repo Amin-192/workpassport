@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
+import { FileText } from 'lucide-react'
 
 export default function WorkerPage() {
   const [credentials, setCredentials] = useState<Credential[]>([])
@@ -79,7 +80,7 @@ export default function WorkerPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                   {cred.skills.map((skill: string, i: number) => (
+                  {cred.skills.map((skill: string, i: number) => (
                     <span 
                       key={i}
                       className="px-3 py-1 bg-bg-secondary border border-border rounded-full text-sm"
@@ -93,7 +94,7 @@ export default function WorkerPage() {
           </div>
         ) : (
           <div className="border border-border rounded-xl p-12 text-center">
-            <div className="text-4xl mb-4">📋</div>
+            <FileText className="w-12 h-12 text-text-secondary mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No credentials yet</h3>
             <p className="text-sm text-text-secondary">Enter your address above to load credentials</p>
           </div>
