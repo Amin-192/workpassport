@@ -1,4 +1,77 @@
+'use client'
+import { useState } from 'react'
+import { ethers } from 'ethers'
+import { supabase } from '@/lib/supabase'
+
 export default function EmployerPage() {
+  const [formData, setFormData] = useState({
+    workerAddress: '',
+    position: '',
+    company: '',
+    startDate: '',
+    endDate: '',
+    skills: ''
+  })
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      if (typeof window.ethereum === 'undefined') {
+        alert('Please install MetaMask!')
+        return
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      await provider.send("eth_requestAccounts", [])
+      const signer = await provider.getSigner()
+      const issuerAddress = await signer.getAddress()
+
+      const credential = {
+        worker_address: formData.workerAddress,
+        issuer_address: issuerAddress,
+        position: formData.position,
+        company: formData.company,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+        skills: formData.skills.split(',').map(s => s.trim()),
+        created_at: new Date().toISOString()
+      }
+
+      const message = JSON.stringify(credential)
+      const signature = await signer.signMessage(message)
+
+      const credentialHash = ethers.keccak256(ethers.toUtf8Bytes(message))
+
+      const { error } = await supabase
+        .from('credentials')
+        .insert([{
+          ...credential,
+          credential_hash: credentialHash,
+          signature: signature
+        }])
+
+      if (error) throw error
+
+      alert('Credential issued successfully!')
+      setFormData({
+        workerAddress: '',
+        position: '',
+        company: '',
+        startDate: '',
+        endDate: '',
+        skills: ''
+      })
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Failed to issue credential')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <div className="max-w-4xl mx-auto px-6 py-12">
@@ -8,12 +81,15 @@ export default function EmployerPage() {
         </div>
 
         <div className="border border-border rounded-xl p-8">
-          <form className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium mb-2">Worker Address</label>
               <input 
                 type="text"
+                value={formData.workerAddress}
+                onChange={(e) => setFormData({...formData, workerAddress: e.target.value})}
                 placeholder="0x..."
+                required
                 className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
               />
             </div>
@@ -22,7 +98,22 @@ export default function EmployerPage() {
               <label className="block text-sm font-medium mb-2">Position</label>
               <input 
                 type="text"
+                value={formData.position}
+                onChange={(e) => setFormData({...formData, position: e.target.value})}
                 placeholder="Senior Developer"
+                required
+                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Company</label>
+              <input 
+                type="text"
+                value={formData.company}
+                onChange={(e) => setFormData({...formData, company: e.target.value})}
+                placeholder="TechCorp Kenya"
+                required
                 className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
               />
             </div>
@@ -32,6 +123,9 @@ export default function EmployerPage() {
                 <label className="block text-sm font-medium mb-2">Start Date</label>
                 <input 
                   type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                  required
                   className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
                 />
               </div>
@@ -39,6 +133,8 @@ export default function EmployerPage() {
                 <label className="block text-sm font-medium mb-2">End Date</label>
                 <input 
                   type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
                   className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
                 />
               </div>
@@ -48,16 +144,20 @@ export default function EmployerPage() {
               <label className="block text-sm font-medium mb-2">Skills (comma separated)</label>
               <input 
                 type="text"
+                value={formData.skills}
+                onChange={(e) => setFormData({...formData, skills: e.target.value})}
                 placeholder="React, Node.js, Solidity"
+                required
                 className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
               />
             </div>
 
             <button 
               type="submit"
-              className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors"
+              disabled={loading}
+              className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
             >
-              Sign & Issue Credential
+              {loading ? 'Signing...' : 'Sign & Issue Credential'}
             </button>
           </form>
         </div>
