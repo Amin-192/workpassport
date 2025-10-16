@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+contract WorkPassport {
+    struct Credential {
+        bytes32 credentialHash;
+        address employer;
+        uint256 timestamp;
+        bool isValid;
+    }
+    
+    mapping(address => Credential[]) public workerCredentials;
+    
+    event CredentialIssued(
+        address indexed worker,
+        address indexed employer,
+        bytes32 credentialHash,
+        uint256 timestamp
+    );
+    
+    function issueCredential(
+        address _worker,
+        bytes32 _credentialHash
+    ) public {
+        Credential memory newCredential = Credential({
+            credentialHash: _credentialHash,
+            employer: msg.sender,
+            timestamp: block.timestamp,
+            isValid: true
+        });
+        
+        workerCredentials[_worker].push(newCredential);
+        
+        emit CredentialIssued(_worker, msg.sender, _credentialHash, block.timestamp);
+    }
+    
+    function getCredentialCount(address _worker) public view returns (uint256) {
+        return workerCredentials[_worker].length;
+    }
+    
+    function getCredential(address _worker, uint256 _index) 
+        public 
+        view 
+        returns (
+            bytes32 credentialHash,
+            address employer,
+            uint256 timestamp,
+            bool isValid
+        ) 
+    {
+        require(_index < workerCredentials[_worker].length, "Invalid index");
+        Credential memory cred = workerCredentials[_worker][_index];
+        return (cred.credentialHash, cred.employer, cred.timestamp, cred.isValid);
+    }
+}
