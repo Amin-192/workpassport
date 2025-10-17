@@ -56,36 +56,43 @@ export default function VerifyPage() {
   }
 
   const handleVerify = async () => {
-    setLoading(true)
-    setVerified({})
-    setOnChainVerified({})
-    
-    const { data, error } = await supabase
-      .from('credentials')
-      .select('*')
-      .eq('worker_address', address)
+  setLoading(true)
+  setVerified({})
+  setOnChainVerified({})
+  
+  const { data, error } = await supabase
+    .from('credentials')
+    .select('*')
+    .eq('worker_address', address)
 
-    if (!error && data) {
-      setCredentials(data)
-      
-      // Connect to blockchain
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      
-      // Verify each credential
-      const verificationResults: {[key: string]: boolean} = {}
-      const onChainResults: {[key: string]: boolean} = {}
-      
-      for (const cred of data) {
-        verificationResults[cred.id] = await verifyCredential(cred)
-        onChainResults[cred.id] = await verifyOnChain(cred, provider)
-      }
-      
-      setVerified(verificationResults)
-      setOnChainVerified(onChainResults)
+  if (!error && data) {
+    setCredentials(data)
+    
+    if (typeof window.ethereum === 'undefined') {
+      alert('Please install MetaMask!')
+      setLoading(false)
+      return
     }
     
-    setLoading(false)
+    const provider = new ethers.BrowserProvider(window.ethereum)
+    
+    // Verify each credential
+    const verificationResults: {[key: string]: boolean} = {}
+    const onChainResults: {[key: string]: boolean} = {}
+    
+    for (const cred of data) {
+      verificationResults[cred.id] = await verifyCredential(cred)
+      onChainResults[cred.id] = await verifyOnChain(cred, provider)
+    }
+    
+    setVerified(verificationResults)
+    setOnChainVerified(onChainResults)
   }
+  
+  setLoading(false)
+}
+    
+ 
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
