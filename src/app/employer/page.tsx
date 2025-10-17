@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
 
 export default function EmployerPage() {
   const [formData, setFormData] = useState({
@@ -13,10 +14,12 @@ export default function EmployerPage() {
     skills: ''
   })
   const [loading, setLoading] = useState(false)
+  const [txHash, setTxHash] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setTxHash('')
 
     try {
       if (typeof window.ethereum === 'undefined') {
@@ -29,6 +32,7 @@ export default function EmployerPage() {
       const signer = await provider.getSigner()
       const issuerAddress = await signer.getAddress()
 
+      // Create credential object
       const credential = {
         worker_address: formData.workerAddress,
         issuer_address: issuerAddress,
@@ -40,11 +44,21 @@ export default function EmployerPage() {
         created_at: new Date().toISOString()
       }
 
+      // Sign credential
       const message = JSON.stringify(credential)
       const signature = await signer.signMessage(message)
 
+      // Generate hash
       const credentialHash = ethers.keccak256(ethers.toUtf8Bytes(message))
 
+      // Store hash on blockchain
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer)
+      const tx = await contract.issueCredential(formData.workerAddress, credentialHash)
+      await tx.wait()
+      
+      setTxHash(tx.hash)
+
+      // Save to Supabase
       const { error } = await supabase
         .from('credentials')
         .insert([{
@@ -64,9 +78,9 @@ export default function EmployerPage() {
         endDate: '',
         skills: ''
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error)
-      alert('Failed to issue credential')
+      alert('Failed to issue credential: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -79,6 +93,20 @@ export default function EmployerPage() {
           <h1 className="text-3xl font-bold mb-2">Issue Credentials</h1>
           <p className="text-text-secondary">Sign work credentials for your employees</p>
         </div>
+
+        {txHash && (
+          <div className="mb-6 p-4 border border-border rounded-lg bg-bg-secondary">
+            <p className="text-sm">Transaction successful!</p>
+            <a 
+              href={`https://sepolia.etherscan.io/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-text-secondary hover:text-text-primary"
+            >
+              View on Etherscan →
+            </a>
+          </div>
+        )}
 
         <div className="border border-border rounded-xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -157,7 +185,7 @@ export default function EmployerPage() {
               disabled={loading}
               className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
             >
-              {loading ? 'Signing...' : 'Sign & Issue Credential'}
+              {loading ? 'Signing & Storing on Blockchain...' : 'Sign & Issue Credential'}
             </button>
           </form>
         </div>
