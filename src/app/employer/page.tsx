@@ -32,6 +32,8 @@ export default function EmployerPage() {
       const signer = await provider.getSigner()
       const issuerAddress = await signer.getAddress()
 
+      const createdAt = new Date().toISOString()
+
       // Create credential object
       const credential = {
         worker_address: formData.workerAddress,
@@ -39,9 +41,9 @@ export default function EmployerPage() {
         position: formData.position,
         company: formData.company,
         start_date: formData.startDate,
-        end_date: formData.endDate,
+        end_date: formData.endDate || null,
         skills: formData.skills.split(',').map(s => s.trim()),
-        created_at: new Date().toISOString()
+        created_at: createdAt
       }
 
       // Sign credential
@@ -64,7 +66,8 @@ export default function EmployerPage() {
         .insert([{
           ...credential,
           credential_hash: credentialHash,
-          signature: signature
+          signature: signature,
+          signed_message: message
         }])
 
       if (error) throw error
