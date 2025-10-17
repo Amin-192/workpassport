@@ -3,13 +3,15 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
 import { ethers } from 'ethers'
-import { CheckCircle2, XCircle, Search, FileX } from 'lucide-react'
+import { CheckCircle2, XCircle, Search, FileX, Shield } from 'lucide-react'
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
 
 export default function VerifyPage() {
   const [address, setAddress] = useState('')
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(false)
   const [verified, setVerified] = useState<{[key: string]: boolean}>({})
+  const [onChainVerified, setOnChainVerified] = useState<{[key: string]: boolean}>({})
 
   const verifyCredential = async (cred: Credential) => {
     try {
@@ -34,9 +36,29 @@ export default function VerifyPage() {
     }
   }
 
+  const verifyOnChain = async (cred: Credential, provider: ethers.BrowserProvider) => {
+    try {
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider)
+      const count = await contract.getCredentialCount(cred.worker_address)
+      
+      // Check all on-chain credentials for this worker
+      for (let i = 0; i < count; i++) {
+        const [hash] = await contract.getCredential(cred.worker_address, i)
+        if (hash === cred.credential_hash) {
+          return true
+        }
+      }
+      return false
+    } catch (error) {
+      console.error('On-chain verification error:', error)
+      return false
+    }
+  }
+
   const handleVerify = async () => {
     setLoading(true)
     setVerified({})
+    setOnChainVerified({})
     
     const { data, error } = await supabase
       .from('credentials')
@@ -46,11 +68,20 @@ export default function VerifyPage() {
     if (!error && data) {
       setCredentials(data)
       
+      // Connect to blockchain
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      
+      // Verify each credential
       const verificationResults: {[key: string]: boolean} = {}
+      const onChainResults: {[key: string]: boolean} = {}
+      
       for (const cred of data) {
         verificationResults[cred.id] = await verifyCredential(cred)
+        onChainResults[cred.id] = await verifyOnChain(cred, provider)
       }
+      
       setVerified(verificationResults)
+      setOnChainVerified(onChainResults)
     }
     
     setLoading(false)
@@ -102,18 +133,33 @@ export default function VerifyPage() {
                       Issued by: {cred.issuer_address.slice(0, 6)}...{cred.issuer_address.slice(-4)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {verified[cred.id] ? (
-                      <>
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        <span className="text-sm text-green-500">Verified</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-5 h-5 text-red-500" />
-                        <span className="text-sm text-red-500">Invalid</span>
-                      </>
-                    )}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {verified[cred.id] ? (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          <span className="text-sm text-green-500">Signature Valid</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-5 h-5 text-red-500" />
+                          <span className="text-sm text-red-500">Invalid Signature</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {onChainVerified[cred.id] ? (
+                        <>
+                          <Shield className="w-5 h-5 text-green-500" />
+                          <span className="text-sm text-green-500">On-Chain Verified</span>
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="w-5 h-5 text-red-500" />
+                          <span className="text-sm text-red-500">Not On-Chain</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
