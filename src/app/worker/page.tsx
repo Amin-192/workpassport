@@ -70,15 +70,55 @@ export default function WorkerPage() {
               {githubLoading ? 'Loading...' : 'Load GitHub Data'}
             </button>
           ) : (
-            <div className="p-4 border border-border rounded-lg bg-bg-secondary">
-              <p className="text-sm">Connected as: <span className="font-semibold">{githubData.user.login}</span></p>
-              <p className="text-sm text-text-secondary mb-3">{githubData.repos.length} repositories found</p>
-              <button
-                onClick={handleGenerateCredential}
-                className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors"
-              >
-                Generate Credential
-              </button>
+            <div className="border border-border rounded-xl p-6 mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-semibold mb-1">GitHub Profile</h3>
+                  <p className="text-sm text-text-secondary">@{githubData.user.login}</p>
+                </div>
+                <button
+                  onClick={handleGenerateCredential}
+                  className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors"
+                >
+                  Generate Credential
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
+                  <div className="text-2xl font-bold mb-1">{githubData.repos.length}</div>
+                  <div className="text-sm text-text-secondary">Repositories</div>
+                </div>
+                <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
+                  <div className="text-2xl font-bold mb-1">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {new Set(githubData.repos.map((r: any) => r.language).filter(Boolean)).size}
+                  </div>
+                  <div className="text-sm text-text-secondary">Languages</div>
+                </div>
+                <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
+                  <div className="text-2xl font-bold mb-1">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {githubData.repos.filter((r: any) => !r.fork).length}
+                  </div>
+                  <div className="text-sm text-text-secondary">Original Repos</div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold mb-3">Top Languages</h4>
+                <div className="flex gap-2 flex-wrap">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {Array.from(new Set(githubData.repos.map((r: any) => r.language).filter(Boolean))).slice(0, 8).map((lang: any, i: number) => (
+                    <span 
+                      key={i}
+                      className="px-3 py-1 bg-bg-secondary border border-border rounded-full text-sm"
+                    >
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
