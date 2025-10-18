@@ -6,6 +6,7 @@ import { FileText } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
+
 export default function WorkerPage() {
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
@@ -13,6 +14,25 @@ export default function WorkerPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [githubData, setGithubData] = useState<{ user: { login: string }, repos: any[] } | null>(null)
   const [githubLoading, setGithubLoading] = useState(false)
+
+  useEffect(() => {
+    const loadWalletAddress = async () => {
+      if (typeof window.ethereum !== 'undefined') {
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum)
+          const accounts = await provider.send("eth_requestAccounts", [])
+          if (accounts[0]) {
+            setAddress(accounts[0])
+            fetchCredentials(accounts[0])
+          }
+        } catch (error) {
+          console.error('Failed to load wallet:', error)
+        }
+      }
+    }
+    
+    loadWalletAddress()
+  }, [])
 
   const fetchCredentials = async (workerAddress: string) => {
     setLoading(true)
@@ -42,67 +62,65 @@ export default function WorkerPage() {
   }
 
   const handleGenerateCredential = async () => {
-  if (!githubData || !address) {
-    alert('Please load GitHub data and enter your wallet address first')
-    return
-  }
-  
-  if (typeof window.ethereum === 'undefined') {
-    alert('Please install MetaMask!')
-    return
-  }
+    if (!githubData || !address) {
+      alert('Please load GitHub data and enter your wallet address first')
+      return
+    }
+    
+    if (typeof window.ethereum === 'undefined') {
+      alert('Please install MetaMask!')
+      return
+    }
 
-  try {
-    setLoading(true)
-    
-    const credential = generateGitHubCredential(githubData, address)
-    
-    // Sign the credential
-    const provider = new ethers.BrowserProvider(window.ethereum)
-    await provider.send("eth_requestAccounts", [])
-    const signer = await provider.getSigner()
-    
-    const message = createCredentialMessage({
-      worker_address: credential.worker_address,
-      issuer_address: await signer.getAddress(),
-      position: credential.position,
-      company: credential.company,
-      start_date: credential.start_date,
-      end_date: credential.end_date,
-      skills: credential.skills,
-      created_at: new Date().toISOString()
-    })
-    
-    const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
-    const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
-    
-    // Store in Supabase
-    const { error } = await supabase.from('credentials').insert([{
-      worker_address: credential.worker_address,
-      issuer_address: await signer.getAddress(),
-      position: credential.position,
-      company: credential.company,
-      start_date: credential.start_date,
-      end_date: credential.end_date || null,
-      skills: credential.skills,
-      created_at: new Date().toISOString(),
-      credential_hash: credentialHash,
-      signature: signature,
-      signed_message: JSON.stringify(message)
-    }])
-    
-    if (error) throw error
-    
-    alert('GitHub credential signed and stored successfully!')
-    fetchCredentials(address)
-  } catch (error: unknown) {
-    console.error('Error:', error)
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    alert('Failed to sign credential: ' + message)
-  } finally {
-    setLoading(false)
+    try {
+      setLoading(true)
+      
+      const credential = generateGitHubCredential(githubData, address)
+      
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      await provider.send("eth_requestAccounts", [])
+      const signer = await provider.getSigner()
+      
+      const message = createCredentialMessage({
+        worker_address: credential.worker_address,
+        issuer_address: await signer.getAddress(),
+        position: credential.position,
+        company: credential.company,
+        start_date: credential.start_date,
+        end_date: credential.end_date,
+        skills: credential.skills,
+        created_at: new Date().toISOString()
+      })
+      
+      const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
+      const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
+      
+      const { error } = await supabase.from('credentials').insert([{
+        worker_address: credential.worker_address,
+        issuer_address: await signer.getAddress(),
+        position: credential.position,
+        company: credential.company,
+        start_date: credential.start_date,
+        end_date: credential.end_date || null,
+        skills: credential.skills,
+        created_at: new Date().toISOString(),
+        credential_hash: credentialHash,
+        signature: signature,
+        signed_message: JSON.stringify(message)
+      }])
+      
+      if (error) throw error
+      
+      alert('GitHub credential signed and stored successfully!')
+      fetchCredentials(address)
+    } catch (error: unknown) {
+      console.error('Error:', error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      alert('Failed to sign credential: ' + message)
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
