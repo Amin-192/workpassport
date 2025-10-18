@@ -10,6 +10,7 @@ export interface Credential {
   created_at: string
   credential_hash: string
   signature: string
+  signed_message: string
 }
 
 export interface GitHubCredential {
