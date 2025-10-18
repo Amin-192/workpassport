@@ -24,6 +24,7 @@ export default function WorkerPage() {
           if (accounts[0]) {
             setAddress(accounts[0])
             fetchCredentials(accounts[0])
+            fetchGitHubData()
           }
         } catch (error) {
           console.error('Failed to load wallet:', error)
