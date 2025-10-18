@@ -3,14 +3,15 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
 import { FileText } from 'lucide-react'
+import { generateGitHubCredential } from '@/lib/generateCredential'
 
 export default function WorkerPage() {
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [githubData, setGithubData] = useState<{ user: { login: string }, repos: any[] } | null>(null)
   const [githubLoading, setGithubLoading] = useState(false)
-
 
   const fetchCredentials = async (workerAddress: string) => {
     setLoading(true)
@@ -26,18 +27,30 @@ export default function WorkerPage() {
   }
 
   const fetchGitHubData = async () => {
-  setGithubLoading(true)
-  try {
-    const response = await fetch('/api/auth/github/repos')
-    if (response.ok) {
-      const data = await response.json()
-      setGithubData(data)
+    setGithubLoading(true)
+    try {
+      const response = await fetch('/api/auth/github/repos')
+      if (response.ok) {
+        const data = await response.json()
+        setGithubData(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch GitHub data:', error)
     }
-  } catch (error) {
-    console.error('Failed to fetch GitHub data:', error)
+    setGithubLoading(false)
   }
-  setGithubLoading(false)
-}
+
+  const handleGenerateCredential = () => {
+    if (!githubData || !address) {
+      alert('Please load GitHub data and enter your wallet address first')
+      return
+    }
+    
+    const credential = generateGitHubCredential(githubData, address)
+    console.log('Generated credential:', credential)
+    
+    alert(`Generated credential for ${credential.company}!\nSkills: ${credential.skills.join(', ')}`)
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
@@ -48,21 +61,27 @@ export default function WorkerPage() {
         </div>
 
         <div className="mb-6">
-  {!githubData ? (
-    <button
-      onClick={fetchGitHubData}
-      disabled={githubLoading}
-      className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
-    >
-      {githubLoading ? 'Loading...' : 'Load GitHub Data'}
-    </button>
-  ) : (
-    <div className="p-4 border border-border rounded-lg bg-bg-secondary">
-      <p className="text-sm">Connected as: <span className="font-semibold">{githubData.user.login}</span></p>
-      <p className="text-sm text-text-secondary">{githubData.repos.length} repositories found</p>
-    </div>
-  )}
-</div>
+          {!githubData ? (
+            <button
+              onClick={fetchGitHubData}
+              disabled={githubLoading}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
+            >
+              {githubLoading ? 'Loading...' : 'Load GitHub Data'}
+            </button>
+          ) : (
+            <div className="p-4 border border-border rounded-lg bg-bg-secondary">
+              <p className="text-sm">Connected as: <span className="font-semibold">{githubData.user.login}</span></p>
+              <p className="text-sm text-text-secondary mb-3">{githubData.repos.length} repositories found</p>
+              <button
+                onClick={handleGenerateCredential}
+                className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors"
+              >
+                Generate Credential
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="mb-8">
           <div className="flex gap-4">
