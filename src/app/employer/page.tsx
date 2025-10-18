@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
-
+import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 export default function EmployerPage() {
   const [formData, setFormData] = useState({
     workerAddress: '',
@@ -46,12 +46,13 @@ export default function EmployerPage() {
         created_at: createdAt
       }
 
-      // Sign credential
-      const message = JSON.stringify(credential)
-      const signature = await signer.signMessage(message)
+      /// Sign credential with EIP-712
+      const message = createCredentialMessage(credential)
+      const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
 
-      // Generate hash
-      const credentialHash = ethers.keccak256(ethers.toUtf8Bytes(message))
+      // Generate hash from typed data
+      const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
+      const signedMessage = JSON.stringify(message)
 
       // Store hash on blockchain
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer)
@@ -67,7 +68,7 @@ export default function EmployerPage() {
           ...credential,
           credential_hash: credentialHash,
           signature: signature,
-          signed_message: message
+         signed_message: signedMessage 
         }])
 
       if (error) throw error
@@ -81,9 +82,9 @@ export default function EmployerPage() {
         endDate: '',
         skills: ''
       })
-    } catch (error: any) {
-      console.error('Error:', error)
-      alert('Failed to issue credential: ' + error.message)
+    } catch (error: unknown) {
+     const message = error instanceof Error ? error.message : 'Unknown error'
+      alert('Failed to issue credential: ' + message)
     } finally {
       setLoading(false)
     }

@@ -5,7 +5,7 @@ import { Credential } from '@/types/credentials'
 import { ethers } from 'ethers'
 import { CheckCircle2, XCircle, Search, FileX, Shield } from 'lucide-react'
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
-
+import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 export default function VerifyPage() {
   const [address, setAddress] = useState('')
   const [credentials, setCredentials] = useState<Credential[]>([])
@@ -13,15 +13,21 @@ export default function VerifyPage() {
   const [verified, setVerified] = useState<{[key: string]: boolean}>({})
   const [onChainVerified, setOnChainVerified] = useState<{[key: string]: boolean}>({})
 
-  const verifyCredential = async (cred: Credential) => {
-    try {
-      const recoveredAddress = ethers.verifyMessage(cred.signed_message, cred.signature)
-      return recoveredAddress.toLowerCase() === cred.issuer_address.toLowerCase()
-    } catch (error) {
-      console.error('Verification error:', error)
-      return false
-    }
+ const verifyCredential = async (cred: Credential) => {
+  try {
+    const message = JSON.parse(cred.signed_message)
+    const recoveredAddress = ethers.verifyTypedData(
+      DOMAIN,
+      CREDENTIAL_TYPES,
+      message,
+      cred.signature
+    )
+    return recoveredAddress.toLowerCase() === cred.issuer_address.toLowerCase()
+  } catch (error) {
+    console.error('Verification error:', error)
+    return false
   }
+}
 
   const verifyOnChain = async (cred: Credential, provider: ethers.BrowserProvider) => {
     try {
@@ -82,7 +88,7 @@ export default function VerifyPage() {
       <div className="max-w-4xl mx-auto px-6 py-12">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Verify Credentials</h1>
-          <p className="text-text-secondary">Check the authenticity of a worker's credentials</p>
+          <p className="text-text-secondary">Check the authenticity of a worker&apos;s credentials</p>
         </div>
 
         <div className="border border-border rounded-xl p-8 mb-8">
