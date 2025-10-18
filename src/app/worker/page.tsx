@@ -40,7 +40,7 @@ export default function WorkerPage() {
     const { data, error } = await supabase
       .from('credentials')
       .select('*')
-      .eq('worker_address', workerAddress)
+      .ilike('worker_address', workerAddress)
     
     if (!error && data) {
       setCredentials(data)

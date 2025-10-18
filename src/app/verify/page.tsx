@@ -55,7 +55,7 @@ export default function VerifyPage() {
     const { data, error } = await supabase
       .from('credentials')
       .select('*')
-      .eq('worker_address', address)
+      .ilike('worker_address', address)
 
     if (!error && data) {
       setCredentials(data)
