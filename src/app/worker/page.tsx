@@ -2,12 +2,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText } from 'lucide-react'
+import { FileText, CheckCircle2 } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
+import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
 
 export default function WorkerPage() {
   const [credentials, setCredentials] = useState<Credential[]>([])
@@ -136,6 +137,75 @@ export default function WorkerPage() {
     } finally {
       setGithubLoading(false)
     }
+  }
+
+  const ClaimButton = ({ cred }: { cred: Credential }) => {
+    const [claiming, setClaiming] = useState(false)
+    const [escrowInfo, setEscrowInfo] = useState<{amount: string, claimed: boolean} | null>(null)
+
+    useEffect(() => {
+      checkEscrow()
+    }, [])
+
+    const checkEscrow = async () => {
+      if (typeof window.ethereum === 'undefined') return
+      
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, provider)
+        const [, amount, claimed] = await escrow.getEscrow(cred.worker_address, cred.credential_hash)
+        
+        if (amount > 0n) {
+          setEscrowInfo({
+            amount: ethers.formatUnits(amount, 6),
+            claimed
+          })
+        }
+      } catch (error) {
+        console.error('Failed to check escrow:', error)
+      }
+    }
+
+    const handleClaim = async () => {
+      setClaiming(true)
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const signer = await provider.getSigner()
+        const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
+        
+        const tx = await escrow.claimPayment(cred.credential_hash)
+        await tx.wait()
+        
+        alert('Payment claimed successfully!')
+        checkEscrow()
+      } catch (error) {
+        console.error('Claim failed:', error)
+        alert('Failed to claim payment')
+      } finally {
+        setClaiming(false)
+      }
+    }
+
+    if (!escrowInfo || escrowInfo.amount === '0') return null
+
+    return (
+      <div className="mt-4 pt-4 border-t border-border">
+        {escrowInfo.claimed ? (
+          <div className="flex items-center gap-2 text-green-500 text-sm">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Payment claimed: {escrowInfo.amount} PYUSD</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleClaim}
+            disabled={claiming}
+            className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
+          >
+            {claiming ? 'Claiming...' : `Claim ${escrowInfo.amount} PYUSD`}
+          </button>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -328,6 +398,7 @@ export default function WorkerPage() {
                         </span>
                       ))}
                     </div>
+                    <ClaimButton cred={cred} />
                   </div>
                 )
               }
