@@ -127,11 +127,12 @@ export default function EmployerPage() {
           <p className="text-text-secondary">Sign work credentials and escrow payment</p>
         </div>
 
-        {status && (
-          <div className="mb-6 p-4 border border-border rounded-lg bg-bg-secondary">
-            <p className="text-sm">{status}</p>
-          </div>
-        )}
+            {status && (
+              <div className="mb-6 p-4 border border-green-500/50 rounded-lg bg-green-500/10 flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm font-medium text-green-500">{status}</p>
+              </div>
+            )}
 
         {txHash && (
           <div className="mb-6 p-4 border border-border rounded-lg bg-bg-secondary">
@@ -232,13 +233,18 @@ export default function EmployerPage() {
               <p className="text-xs text-text-secondary mt-1">Leave empty to issue credential without payment</p>
             </div>
 
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
-            >
-              {loading ? status || 'Processing...' : 'Sign & Issue Credential'}
-            </button>
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    {status || 'Processing...'}
+                  </span>
+                ) : 'Sign & Issue Credential'}
+              </button>
           </form>
         </div>
       </div>
