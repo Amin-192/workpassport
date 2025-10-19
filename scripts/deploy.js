@@ -1,12 +1,13 @@
 const hre = require("hardhat");
 
 async function main() {
-  const WorkPassport = await hre.ethers.getContractFactory("WorkPassport");
-  const workPassport = await WorkPassport.deploy();
+  const PYUSD_SEPOLIA = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
   
-  await workPassport.waitForDeployment();
-  
-  console.log("WorkPassport deployed to:", await workPassport.getAddress());
+  console.log("Deploying PaymentEscrow...");
+  const PaymentEscrow = await hre.ethers.getContractFactory("PaymentEscrow");
+  const escrow = await PaymentEscrow.deploy(PYUSD_SEPOLIA);
+  await escrow.waitForDeployment();
+  console.log("PaymentEscrow deployed to:", await escrow.getAddress());
 }
 
 main().catch((error) => {
