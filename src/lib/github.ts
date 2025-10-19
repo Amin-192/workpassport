@@ -13,11 +13,12 @@ export async function getGitHubData(token: string) {
     affiliation: 'owner,collaborator'
   })
   
-  // Get total commit count across all repos
+  // Get total commit count and timeline
   let totalCommits = 0
   const repoCommits: { [key: string]: number } = {}
+  const contributionsByMonth: { [key: string]: number } = {}
   
-  for (const repo of repos.slice(0, 10)) { // Check last 10 active repos for performance
+  for (const repo of repos.slice(0, 25)) { 
     try {
       const { data: commits } = await octokit.request('GET /repos/{owner}/{repo}/commits', {
         owner: repo.owner.login,
@@ -27,16 +28,36 @@ export async function getGitHubData(token: string) {
       })
       repoCommits[repo.name] = commits.length
       totalCommits += commits.length
+      
+      // Group commits by month
+      commits.forEach((commit: any) => {
+        const date = new Date(commit.commit.author.date)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        contributionsByMonth[monthKey] = (contributionsByMonth[monthKey] || 0) + 1
+      })
     } catch (error) {
       console.error(`Error fetching commits for ${repo.name}:`, error)
     }
+  }
+  
+  // Convert contributions to array for charting (last 12 months)
+  const now = new Date()
+  const contributionsTimeline = []
+  for (let i = 11; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    contributionsTimeline.push({
+      month: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      commits: contributionsByMonth[monthKey] || 0
+    })
   }
   
   return {
     user,
     repos,
     totalCommits,
-    repoCommits
+    repoCommits,
+    contributionsTimeline
   }
 }
 

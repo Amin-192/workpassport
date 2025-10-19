@@ -6,6 +6,7 @@ import { FileText } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function WorkerPage() {
   const [credentials, setCredentials] = useState<Credential[]>([])
@@ -16,7 +17,8 @@ export default function WorkerPage() {
     user: { login: string }, 
     repos: any[], 
     totalCommits: number,
-    repoCommits: { [key: string]: number }
+    repoCommits: { [key: string]: number },
+    contributionsTimeline: { month: string, commits: number }[]
   } | null>(null)
   const [githubLoading, setGithubLoading] = useState(false)
 
@@ -166,7 +168,7 @@ export default function WorkerPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">{githubData.repos.length}</div>
                   <div className="text-sm text-text-secondary">Total Repositories</div>
@@ -184,7 +186,6 @@ export default function WorkerPage() {
                   </div>
                   <div className="text-sm text-text-secondary">Languages Used</div>
                 </div>
-                
               </div>
 
               <div className="mt-6">
@@ -200,6 +201,31 @@ export default function WorkerPage() {
                     </span>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold mb-3">Contribution Activity (Last 12 Months)</h4>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={githubData.contributionsTimeline}>
+                    <XAxis 
+                      dataKey="month" 
+                      stroke="#71717a"
+                      style={{ fontSize: '12px' }}
+                    />
+                    <YAxis 
+                      stroke="#71717a"
+                      style={{ fontSize: '12px' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#18181b', 
+                        border: '1px solid #27272a',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Bar dataKey="commits" fill="#ffffff" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           )}
