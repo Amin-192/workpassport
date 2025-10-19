@@ -12,7 +12,12 @@ export default function WorkerPage() {
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(false)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [githubData, setGithubData] = useState<{ user: { login: string }, repos: any[] } | null>(null)
+  const [githubData, setGithubData] = useState<{ 
+    user: { login: string }, 
+    repos: any[], 
+    totalCommits: number,
+    repoCommits: { [key: string]: number }
+  } | null>(null)
   const [githubLoading, setGithubLoading] = useState(false)
 
   useEffect(() => {
@@ -161,25 +166,25 @@ export default function WorkerPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">{githubData.repos.length}</div>
-                  <div className="text-sm text-text-secondary">Repositories</div>
+                  <div className="text-sm text-text-secondary">Total Repositories</div>
+                </div>
+                <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
+                  <div className="text-2xl font-bold mb-1">
+                    {githubData.totalCommits}+
+                  </div>
+                  <div className="text-sm text-text-secondary">Total Commits</div>
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {new Set(githubData.repos.map((r: any) => r.language).filter(Boolean)).size}
                   </div>
-                  <div className="text-sm text-text-secondary">Languages</div>
+                  <div className="text-sm text-text-secondary">Languages Used</div>
                 </div>
-                <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
-                  <div className="text-2xl font-bold mb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {githubData.repos.filter((r: any) => !r.fork).length}
-                  </div>
-                  <div className="text-sm text-text-secondary">Original Repos</div>
-                </div>
+                
               </div>
 
               <div className="mt-6">
