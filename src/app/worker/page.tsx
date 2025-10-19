@@ -173,7 +173,8 @@ if (typeof window.ethereum === 'undefined') {
   alert('Please install MetaMask!')
   return
 }
-const provider = new ethers.BrowserProvider(window.ethereum)        const signer = await provider.getSigner()
+const provider = new ethers.BrowserProvider(window.ethereum)
+        const signer = await provider.getSigner()
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
         
         const tx = await escrow.claimPayment(cred.credential_hash)
