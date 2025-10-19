@@ -155,7 +155,7 @@ export default function WorkerPage() {
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, provider)
         const [, amount, claimed] = await escrow.getEscrow(cred.worker_address, cred.credential_hash)
         
-        if (amount > 0n) {
+if (amount > BigInt(0)) {
           setEscrowInfo({
             amount: ethers.formatUnits(amount, 6),
             claimed
@@ -169,8 +169,11 @@ export default function WorkerPage() {
     const handleClaim = async () => {
       setClaiming(true)
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const signer = await provider.getSigner()
+if (typeof window.ethereum === 'undefined') {
+  alert('Please install MetaMask!')
+  return
+}
+const provider = new ethers.BrowserProvider(window.ethereum)        const signer = await provider.getSigner()
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
         
         const tx = await escrow.claimPayment(cred.credential_hash)
