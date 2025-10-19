@@ -56,57 +56,23 @@ export default function WorkerPage() {
     setLoading(false)
   }
 
-  const fetchGitHubData = async (walletAddress: string) => {
-    // Check cache first with wallet address
-    const cached = getCachedGitHubData(walletAddress)
-    
-    if (cached) {
-      // Show cached data immediately!
-      setGithubData(cached)
-      setGithubLoading(false)
-    } else {
-      // No cache, show loading
-      setGithubLoading(true)
-    }
-    
-    // Fetch fresh data in background (whether cache exists or not)
+  const autoGenerateGitHubCredential = async (githubData: any, walletAddress: string) => {
     try {
-      const response = await fetch('/api/auth/github/repos')
+      const { data: existing } = await supabase
+        .from('credentials')
+        .select('*')
+        .ilike('worker_address', walletAddress)
+        .ilike('company', '%GitHub (@%')
       
-      if (response.ok) {
-        const freshData = await response.json()
-        
-        // Update display with fresh data
-        setGithubData(freshData)
-        
-        // Save to cache for next time
-        setCachedGitHubData(walletAddress, freshData)
+      if (existing && existing.length > 0) {
+        return
       }
-    } catch (error) {
-      console.error('Failed to fetch GitHub data:', error)
-    } finally {
-      setGithubLoading(false)
-    }
-  }
-
-  const handleGenerateCredential = async () => {
-    if (!githubData || !address) {
-      alert('Please load GitHub data and enter your wallet address first')
-      return
-    }
-    
-    if (typeof window.ethereum === 'undefined') {
-      alert('Please install MetaMask!')
-      return
-    }
-
-    try {
-      setLoading(true)
       
-      const credential = generateGitHubCredential(githubData, address)
+      const credential = generateGitHubCredential(githubData, walletAddress)
+      
+      if (typeof window.ethereum === 'undefined') return
       
       const provider = new ethers.BrowserProvider(window.ethereum)
-      await provider.send("eth_requestAccounts", [])
       const signer = await provider.getSigner()
       
       const message = createCredentialMessage({
@@ -123,7 +89,7 @@ export default function WorkerPage() {
       const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
       const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
       
-      const { error } = await supabase.from('credentials').insert([{
+      await supabase.from('credentials').insert([{
         worker_address: credential.worker_address,
         issuer_address: await signer.getAddress(),
         position: credential.position,
@@ -137,16 +103,38 @@ export default function WorkerPage() {
         signed_message: JSON.stringify(message)
       }])
       
-      if (error) throw error
+      fetchCredentials(walletAddress)
       
-      alert('GitHub credential signed and stored successfully!')
-      fetchCredentials(address)
-    } catch (error: unknown) {
-      console.error('Error:', error)
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      alert('Failed to sign credential: ' + message)
+    } catch (error) {
+      console.error('Failed to auto-generate credential:', error)
+    }
+  }
+
+  const fetchGitHubData = async (walletAddress: string) => {
+    const cached = getCachedGitHubData(walletAddress)
+    
+    if (cached) {
+      setGithubData(cached)
+      setGithubLoading(false)
+    } else {
+      setGithubLoading(true)
+    }
+    
+    try {
+      const response = await fetch('/api/auth/github/repos')
+      
+      if (response.ok) {
+        const freshData = await response.json()
+        
+        setGithubData(freshData)
+        setCachedGitHubData(walletAddress, freshData)
+        
+        await autoGenerateGitHubCredential(freshData, walletAddress)
+      }
+    } catch (error) {
+      console.error('Failed to fetch GitHub data:', error)
     } finally {
-      setLoading(false)
+      setGithubLoading(false)
     }
   }
 
@@ -175,17 +163,9 @@ export default function WorkerPage() {
             </a>
           ) : (
             <div className="border border-border rounded-xl p-6 mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-xl font-semibold mb-1">GitHub Profile</h3>
-                  <p className="text-sm text-text-secondary">@{githubData.user.login}</p>
-                </div>
-                <button
-                  onClick={handleGenerateCredential}
-                  className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors"
-                >
-                  Generate Credential
-                </button>
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold mb-1">GitHub Profile</h3>
+                <p className="text-sm text-text-secondary">@{githubData.user.login}</p>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
