@@ -13,19 +13,59 @@ export default function Navigation() {
   useEffect(() => {
     checkRole()
     
-    // Recheck role when storage changes (in case of role selection)
-    window.addEventListener('storage', checkRole)
+    const handleStorageChange = () => {
+      checkRole()
+    }
     
-    // Also check on focus in case user switched wallets in MetaMask
-    window.addEventListener('focus', checkRole)
+    const handleDisconnect = () => {
+      setUserRole(null)
+    }
+    
+    const handleFocus = () => {
+      checkRole()
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('wallet-disconnected', handleDisconnect)
+    window.addEventListener('focus', handleFocus)
+    
+    if (typeof window.ethereum !== 'undefined' && window.ethereum.on) {
+      const handleAccountsChanged = (...args: unknown[]) => {
+        const accounts = args[0] as string[]
+        if (accounts.length === 0) {
+          setUserRole(null)
+        } else {
+          checkRole()
+        }
+      }
+
+      window.ethereum.on('accountsChanged', handleAccountsChanged)
+      
+      return () => {
+        window.removeEventListener('storage', handleStorageChange)
+        window.removeEventListener('wallet-disconnected', handleDisconnect)
+        window.removeEventListener('focus', handleFocus)
+        if (window.ethereum?.removeListener) {
+          window.ethereum.removeListener('accountsChanged', handleAccountsChanged)
+        }
+      }
+    }
     
     return () => {
-      window.removeEventListener('storage', checkRole)
-      window.removeEventListener('focus', checkRole)
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('wallet-disconnected', handleDisconnect)
+      window.removeEventListener('focus', handleFocus)
     }
   }, [])
 
   const checkRole = async () => {
+    const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
+    if (hasDisconnected) {
+      setUserRole(null)
+      setLoading(false)
+      return
+    }
+
     if (typeof window.ethereum !== 'undefined') {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum)
@@ -34,7 +74,6 @@ export default function Navigation() {
         if (accounts.length > 0) {
           const address = await accounts[0].getAddress()
           
-          // Check database for role (source of truth)
           const { data } = await supabase
             .from('wallet_roles')
             .select('role')
@@ -63,7 +102,7 @@ export default function Navigation() {
 
   if (loading) {
     return (
-      <nav className=" bg-bg-primary">
+      <nav className="border-b border-border bg-bg-primary">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center group">
@@ -78,7 +117,7 @@ export default function Navigation() {
   }
 
   return (
-    <nav className=" bg-bg-primary">
+    <nav className="border-b border-border bg-bg-primary">
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center group">
