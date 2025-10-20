@@ -1,3 +1,4 @@
+'use client'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import Features from './components/Features'
@@ -6,6 +7,7 @@ import HowItWorks from './components/HowItWorks'
 export default function Home() {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
+      {/* Hero Section */}
       <section className="relative px-6 pt-32 pb-24">
         <div className="max-w-4xl mx-auto">
           <div className="inline-block mb-4 px-3 py-1 border border-border rounded-full text-xs text-text-secondary tracking-wide">
@@ -41,6 +43,7 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Grid background */}
         <div className="absolute inset-0 -z-10 opacity-20">
           <div className="absolute inset-0" style={{
             backgroundImage: `
