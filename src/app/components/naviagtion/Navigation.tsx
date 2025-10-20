@@ -3,17 +3,40 @@ import { useEffect, useState } from 'react'
 import Link from "next/link"
 import Image from "next/image"
 import WalletConnect from "../WalletConnect"
+import { ethers } from 'ethers'
 
 export default function Navigation() {
   const [userRole, setUserRole] = useState<'worker' | 'employer' | null>(null)
 
   useEffect(() => {
-    const role = localStorage.getItem('userRole') as 'worker' | 'employer' | null
-    setUserRole(role)
+    checkRole()
+    
+    // Recheck role when storage changes (in case of role selection)
+    window.addEventListener('storage', checkRole)
+    return () => window.removeEventListener('storage', checkRole)
   }, [])
 
+  const checkRole = async () => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const accounts = await provider.listAccounts()
+        
+        if (accounts.length > 0) {
+          const address = await accounts[0].getAddress()
+          const role = localStorage.getItem(`role_${address}`) as 'worker' | 'employer' | null
+          setUserRole(role)
+        } else {
+          setUserRole(null)
+        }
+      } catch (error) {
+        console.error('Failed to check role:', error)
+      }
+    }
+  }
+
   return (
-    <nav className="border-border bg-bg-primary">
+    <nav className="border-b border-border bg-bg-primary">
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center group">
