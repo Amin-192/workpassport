@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import WalletConnect from "../WalletConnect";
 
 export default function Navigation() {
@@ -6,9 +7,9 @@ export default function Navigation() {
     <nav className=" border-border bg-bg-primary">
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 group">
-            
-            <span className="text-lg text-white font-semibold tracking-tight">WorkPassport</span>
+          <Link href="/" className="flex items-center group">
+            <Image src="/logo.png" alt="WorkPassport" width={50} height={50} />
+            <Image src="/workpassport.png" alt="WorkPassport" width={190} height={90} />
           </Link>
                    
           <div className="flex gap-1 items-center">
