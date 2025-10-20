@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
 import { CONTRACT_ADDRESS, CONTRACT_ABI, ESCROW_ADDRESS, ESCROW_ABI, PYUSD_ADDRESS, PYUSD_ABI } from '@/lib/contract'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
+import { Briefcase, CheckCircle2, Loader2 } from 'lucide-react'
 
 export default function EmployerPage() {
   const [formData, setFormData] = useState({
@@ -18,6 +19,41 @@ export default function EmployerPage() {
   const [loading, setLoading] = useState(false)
   const [txHash, setTxHash] = useState('')
   const [status, setStatus] = useState('')
+  const [recentCredentials, setRecentCredentials] = useState<any[]>([])
+  const [loadingRecent, setLoadingRecent] = useState(true)
+
+  useEffect(() => {
+    loadRecentCredentials()
+  }, [])
+
+  const loadRecentCredentials = async () => {
+    setLoadingRecent(true)
+    if (typeof window.ethereum === 'undefined') {
+      setLoadingRecent(false)
+      return
+    }
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await provider.getSigner()
+      const issuerAddress = await signer.getAddress()
+
+      const { data, error } = await supabase
+        .from('credentials')
+        .select('*')
+        .ilike('issuer_address', issuerAddress)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (!error && data) {
+        setRecentCredentials(data)
+      }
+    } catch (error) {
+      console.error('Failed to load recent credentials:', error)
+    } finally {
+      setLoadingRecent(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,15 +103,13 @@ export default function EmployerPage() {
       if (formData.paymentAmount && parseFloat(formData.paymentAmount) > 0) {
         setStatus('Processing PYUSD payment...')
         
-        const amount = ethers.parseUnits(formData.paymentAmount, 6) // PYUSD has 6 decimals
+        const amount = ethers.parseUnits(formData.paymentAmount, 6)
         
-        // Approve PYUSD
         setStatus('Approving PYUSD...')
         const pyusd = new ethers.Contract(PYUSD_ADDRESS, PYUSD_ABI, signer)
         const approveTx = await pyusd.approve(ESCROW_ADDRESS, amount)
         await approveTx.wait()
         
-        // Deposit to escrow
         setStatus('Depositing to escrow...')
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
         const depositTx = await escrow.depositPayment(
@@ -110,6 +144,8 @@ export default function EmployerPage() {
         skills: '',
         paymentAmount: ''
       })
+      
+      loadRecentCredentials()
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       alert('Failed to issue credential: ' + message)
@@ -121,131 +157,176 @@ export default function EmployerPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Issue Credentials</h1>
-          <p className="text-text-secondary">Sign work credentials and escrow payment</p>
+          <div className="flex items-center gap-3 mb-2">
+            <Briefcase className="w-8 h-8" />
+            <h1 className="text-3xl font-bold">Issue Credentials</h1>
+          </div>
+          <p className="text-text-secondary">Sign work credentials and escrow payment for your workers</p>
         </div>
 
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Form Section */}
+          <div className="lg:col-span-2">
             {status && (
-              <div className="mb-6 p-4 border border-green-500/50 rounded-lg bg-green-500/10 flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-medium text-green-500">{status}</p>
+              <div className="mb-6 p-4 border border-blue-500/50 rounded-lg bg-blue-500/10 flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                <p className="text-sm font-medium text-blue-500">{status}</p>
               </div>
             )}
 
-        {txHash && (
-          <div className="mb-6 p-4 border border-border rounded-lg bg-bg-secondary">
-            <p className="text-sm">Transaction successful!</p>
-            <a 
-              href={`https://sepolia.etherscan.io/tx/${txHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-text-secondary hover:text-text-primary"
-            >
-              View on Etherscan →
-            </a>
+            {txHash && (
+              <div className="mb-6 p-4 border border-green-500/50 rounded-lg bg-green-500/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <p className="text-sm font-medium text-green-500">Transaction successful!</p>
+                </div>
+                <a 
+                  href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-text-secondary hover:text-text-primary underline"
+                >
+                  View on Etherscan →
+                </a>
+              </div>
+            )}
+
+            <div className="border border-border rounded-xl p-8">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Worker Wallet Address</label>
+                  <input 
+                    type="text"
+                    value={formData.workerAddress}
+                    onChange={(e) => setFormData({...formData, workerAddress: e.target.value})}
+                    placeholder="0x..."
+                    required
+                    className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Position</label>
+                    <input 
+                      type="text"
+                      value={formData.position}
+                      onChange={(e) => setFormData({...formData, position: e.target.value})}
+                      placeholder="Senior Developer"
+                      required
+                      className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Company</label>
+                    <input 
+                      type="text"
+                      value={formData.company}
+                      onChange={(e) => setFormData({...formData, company: e.target.value})}
+                      placeholder="TechCorp Kenya"
+                      required
+                      className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Start Date</label>
+                    <input 
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                      required
+                      className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">End Date (Optional)</label>
+                    <input 
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                      className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Skills (comma separated)</label>
+                  <input 
+                    type="text"
+                    value={formData.skills}
+                    onChange={(e) => setFormData({...formData, skills: e.target.value})}
+                    placeholder="React, Node.js, Solidity"
+                    required
+                    className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Payment Amount (PYUSD) - Optional</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={formData.paymentAmount}
+                    onChange={(e) => setFormData({...formData, paymentAmount: e.target.value})}
+                    placeholder="100.00"
+                    className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+                  />
+                  <p className="text-xs text-text-secondary mt-1">Funds will be escrowed until the worker claims</p>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {status || 'Processing...'}
+                    </span>
+                  ) : 'Sign & Issue Credential'}
+                </button>
+              </form>
+            </div>
           </div>
-        )}
 
-        <div className="border border-border rounded-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium mb-2">Worker Address</label>
-              <input 
-                type="text"
-                value={formData.workerAddress}
-                onChange={(e) => setFormData({...formData, workerAddress: e.target.value})}
-                placeholder="0x..."
-                required
-                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-              />
+          {/* Recent Activity Section */}
+          <div className="lg:col-span-1">
+            <div className="border border-border rounded-xl p-6 sticky top-6">
+              <h3 className="text-lg font-semibold mb-4">Recent Credentials</h3>
+              
+              {loadingRecent ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="p-3 border border-border rounded-lg animate-pulse">
+                      <div className="h-4 bg-bg-secondary rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-bg-secondary rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : recentCredentials.length > 0 ? (
+                <div className="space-y-3">
+                  {recentCredentials.map((cred) => (
+                    <div key={cred.id} className="p-3 border border-border rounded-lg hover:border-text-secondary transition-colors">
+                      <h4 className="font-medium text-sm mb-1">{cred.position}</h4>
+                      <p className="text-xs text-text-secondary">{cred.company}</p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        {cred.worker_address.slice(0, 6)}...{cred.worker_address.slice(-4)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-text-secondary">No credentials issued yet</p>
+              )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Position</label>
-              <input 
-                type="text"
-                value={formData.position}
-                onChange={(e) => setFormData({...formData, position: e.target.value})}
-                placeholder="Senior Developer"
-                required
-                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Company</label>
-              <input 
-                type="text"
-                value={formData.company}
-                onChange={(e) => setFormData({...formData, company: e.target.value})}
-                placeholder="TechCorp Kenya"
-                required
-                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Start Date</label>
-                <input 
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                  required
-                  className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">End Date</label>
-                <input 
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                  className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Skills (comma separated)</label>
-              <input 
-                type="text"
-                value={formData.skills}
-                onChange={(e) => setFormData({...formData, skills: e.target.value})}
-                placeholder="React, Node.js, Solidity"
-                required
-                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Payment Amount (PYUSD) - Optional</label>
-              <input 
-                type="number"
-                step="0.01"
-                value={formData.paymentAmount}
-                onChange={(e) => setFormData({...formData, paymentAmount: e.target.value})}
-                placeholder="100.00"
-                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-              />
-              <p className="text-xs text-text-secondary mt-1">Leave empty to issue credential without payment</p>
-            </div>
-
-              <button 
-                type="submit"
-                disabled={loading}
-                className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                    {status || 'Processing...'}
-                  </span>
-                ) : 'Sign & Issue Credential'}
-              </button>
-          </form>
+          </div>
         </div>
       </div>
     </div>
