@@ -11,7 +11,7 @@ export default function WalletConnect() {
     checkConnection()
     
     // Listen for account changes
-    if (typeof window.ethereum !== 'undefined') {
+    if (typeof window.ethereum !== 'undefined' && window.ethereum.on) {
       const handleAccountsChanged = (...args: unknown[]) => {
         const accounts = args[0] as string[]
         if (accounts.length === 0) {
@@ -26,12 +26,14 @@ export default function WalletConnect() {
         window.location.reload()
       }
 
-      window.ethereum.on?.('accountsChanged', handleAccountsChanged)
-      window.ethereum.on?.('chainChanged', handleChainChanged)
+      window.ethereum.on('accountsChanged', handleAccountsChanged)
+      window.ethereum.on('chainChanged', handleChainChanged)
 
       return () => {
-        window.ethereum.removeListener?.('accountsChanged', handleAccountsChanged)
-        window.ethereum.removeListener?.('chainChanged', handleChainChanged)
+        if (window.ethereum?.removeListener) {
+          window.ethereum.removeListener('accountsChanged', handleAccountsChanged)
+          window.ethereum.removeListener('chainChanged', handleChainChanged)
+        }
       }
     }
   }, [])

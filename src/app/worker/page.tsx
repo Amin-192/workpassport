@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText, CheckCircle2, Github, Star, Loader2, User, Briefcase } from 'lucide-react'
+import { FileText, CheckCircle2, Github, Star, Loader2 } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
+import RoleSelector from '../components/RoleSelector'
 
 export default function WorkerPage() {
   const router = useRouter()
@@ -17,7 +18,6 @@ export default function WorkerPage() {
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [showRoleSelector, setShowRoleSelector] = useState(false)
-  const [selectedRole, setSelectedRole] = useState<'worker' | 'employer' | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [githubData, setGithubData] = useState<{ 
     user: { login: string }, 
@@ -29,60 +29,98 @@ export default function WorkerPage() {
   const [githubLoading, setGithubLoading] = useState(false)
 
   useEffect(() => {
-    const loadWalletAddress = async () => {
-      if (typeof window.ethereum !== 'undefined') {
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum)
-          const accounts = await provider.send("eth_requestAccounts", [])
+    checkExistingConnection()
+  }, [router])
+
+  const checkExistingConnection = async () => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        // Use listAccounts instead of eth_requestAccounts to avoid triggering MetaMask
+        const accounts = await provider.listAccounts()
+        
+        if (accounts.length > 0) {
+          const walletAddress = await accounts[0].getAddress()
+          setAddress(walletAddress)
           
-          if (accounts[0]) {
-            const walletAddress = accounts[0]
-            setAddress(walletAddress)
+          // Check database first (source of truth)
+          const { data: dbRole } = await supabase
+            .from('wallet_roles')
+            .select('role')
+            .eq('wallet_address', walletAddress.toLowerCase())
+            .single()
+          
+          if (dbRole) {
+            // Role exists in database
+            const role = dbRole.role
             
-            // Check if this wallet already has a role
-            const storedRole = localStorage.getItem(`role_${walletAddress}`)
+            // Sync to localStorage
+            localStorage.setItem(`role_${walletAddress}`, role)
             
-            if (storedRole) {
-              // Role already set for this wallet
-              if (storedRole === 'employer') {
-                // This wallet is an employer, redirect
-                router.push('/employer')
-                return
-              }
-              // Continue as worker
-              await fetchCredentials(walletAddress)
-              fetchGitHubData(walletAddress)
-            } else {
-              // No role set, need to choose
-              setShowRoleSelector(true)
-              setLoading(false)
+            if (role === 'employer') {
+              router.push('/employer')
+              return
             }
+            // Continue as worker
+            await fetchCredentials(walletAddress)
+            fetchGitHubData(walletAddress)
+          } else {
+            // No role in database, show selector
+            setShowRoleSelector(true)
+            setLoading(false)
           }
-        } catch (error) {
-          console.error('Failed to load wallet:', error)
+        } else {
+          // No wallet connected
           setLoading(false)
         }
-      } else {
+      } catch (error) {
+        console.error('Failed to check connection:', error)
         setLoading(false)
       }
+    } else {
+      setLoading(false)
     }
-    
-    loadWalletAddress()
-  }, [router])
+  }
 
   const handleRoleSelect = async (role: 'worker' | 'employer') => {
     if (!address) return
     
-    // Store role permanently for this wallet
-    localStorage.setItem(`role_${address}`, role)
-    
-    if (role === 'employer') {
-      router.push('/employer')
-    } else {
-      setShowRoleSelector(false)
-      setLoading(true)
-      await fetchCredentials(address)
-      fetchGitHubData(address)
+    try {
+      // Store in database (source of truth)
+      const { error } = await supabase
+        .from('wallet_roles')
+        .insert({
+          wallet_address: address.toLowerCase(),
+          role: role
+        })
+      
+      if (error) {
+        // If error is duplicate key, that means role already exists
+        if (error.code === '23505') {
+          alert('This wallet already has a role assigned.')
+          window.location.reload()
+          return
+        }
+        throw error
+      }
+      
+      // Store in localStorage for quick access
+      localStorage.setItem(`role_${address}`, role)
+      
+      // Trigger storage event for navigation update
+      window.dispatchEvent(new Event('storage'))
+      
+      if (role === 'employer') {
+        router.push('/employer')
+      } else {
+        setShowRoleSelector(false)
+        setLoading(true)
+        await fetchCredentials(address)
+        fetchGitHubData(address)
+      }
+    } catch (error) {
+      console.error('Failed to save role:', error)
+      alert('Failed to save role. Please try again.')
     }
   }
 
@@ -278,61 +316,28 @@ export default function WorkerPage() {
     </div>
   )
 
-  // Role Selector Modal
-  if (showRoleSelector) {
+  // If no wallet connected, show connect prompt
+  if (!address && !showRoleSelector && !loading) {
     return (
-      <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-        <div className="bg-bg-primary border border-border rounded-xl p-8 max-w-md w-full">
-          <h2 className="text-2xl font-bold mb-2">Choose Your Role</h2>
-          <p className="text-text-secondary text-sm mb-2">
-            Select how you'll use WorkPassport
-          </p>
-          <p className="text-yellow-500 text-xs mb-6">
-            ⚠️ This choice is permanent for this wallet address
-          </p>
-
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <button
-              onClick={() => setSelectedRole('worker')}
-              className={`p-6 border-2 rounded-xl transition-all ${
-                selectedRole === 'worker'
-                  ? 'border-white bg-white/5'
-                  : 'border-border hover:border-text-secondary'
-              }`}
-            >
-              <User className="w-8 h-8 mx-auto mb-3" />
-              <div className="font-semibold mb-1">Worker</div>
-              <div className="text-xs text-text-secondary">
-                Manage credentials
-              </div>
-            </button>
-
-            <button
-              onClick={() => setSelectedRole('employer')}
-              className={`p-6 border-2 rounded-xl transition-all ${
-                selectedRole === 'employer'
-                  ? 'border-white bg-white/5'
-                  : 'border-border hover:border-text-secondary'
-              }`}
-            >
-              <Briefcase className="w-8 h-8 mx-auto mb-3" />
-              <div className="font-semibold mb-1">Employer</div>
-              <div className="text-xs text-text-secondary">
-                Issue credentials
-              </div>
-            </button>
+      <div className="min-h-screen bg-bg-primary text-text-primary">
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <div className="border border-border rounded-xl p-12 text-center">
+            <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
+            <p className="text-text-secondary mb-6">
+              Please connect your wallet to access your Work Passport
+            </p>
+            <p className="text-sm text-text-secondary">
+              Click "Connect Wallet" in the top right corner
+            </p>
           </div>
-
-          <button
-            onClick={() => selectedRole && handleRoleSelect(selectedRole)}
-            disabled={!selectedRole}
-            className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Confirm Role
-          </button>
         </div>
       </div>
     )
+  }
+
+  // Role Selector Modal
+  if (showRoleSelector) {
+    return <RoleSelector onSelectRole={handleRoleSelect} />
   }
 
   return (
