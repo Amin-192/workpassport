@@ -2,17 +2,18 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText } from 'lucide-react'
+import { FileText, CheckCircle2, Github, Star } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
+import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
 
 export default function WorkerPage() {
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [githubData, setGithubData] = useState<{ 
     user: { login: string }, 
@@ -31,12 +32,15 @@ export default function WorkerPage() {
           const accounts = await provider.send("eth_requestAccounts", [])
           if (accounts[0]) {
             setAddress(accounts[0])
-            fetchCredentials(accounts[0])
+            await fetchCredentials(accounts[0])
             fetchGitHubData(accounts[0])
           }
         } catch (error) {
           console.error('Failed to load wallet:', error)
+          setLoading(false)
         }
+      } else {
+        setLoading(false)
       }
     }
     
@@ -138,57 +142,176 @@ export default function WorkerPage() {
     }
   }
 
+  const ClaimButton = ({ cred }: { cred: Credential }) => {
+    const [claiming, setClaiming] = useState(false)
+    const [escrowInfo, setEscrowInfo] = useState<{amount: string, claimed: boolean} | null>(null)
+
+    useEffect(() => {
+      checkEscrow()
+    }, [])
+
+    const checkEscrow = async () => {
+      if (typeof window.ethereum === 'undefined') return
+      
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, provider)
+        const [, amount, claimed] = await escrow.getEscrow(cred.worker_address, cred.credential_hash)
+        
+        if (amount > BigInt(0)) {
+          setEscrowInfo({
+            amount: ethers.formatUnits(amount, 6),
+            claimed
+          })
+        }
+      } catch (error) {
+        console.error('Failed to check escrow:', error)
+      }
+    }
+
+    const handleClaim = async () => {
+      setClaiming(true)
+      try {
+        if (typeof window.ethereum === 'undefined') {
+          alert('Please install MetaMask!')
+          return
+        }
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const signer = await provider.getSigner()
+        const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
+        
+        const tx = await escrow.claimPayment(cred.credential_hash)
+        await tx.wait()
+        
+        alert('Payment claimed successfully!')
+        checkEscrow()
+      } catch (error) {
+        console.error('Claim failed:', error)
+        alert('Failed to claim payment')
+      } finally {
+        setClaiming(false)
+      }
+    }
+
+    if (!escrowInfo || escrowInfo.amount === '0') return null
+
+    return (
+      <div className="mt-4 pt-4 border-t border-border">
+        {escrowInfo.claimed ? (
+          <div className="flex items-center gap-2 text-green-500 text-sm">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Payment claimed: {escrowInfo.amount} PYUSD</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleClaim}
+            disabled={claiming}
+            className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {claiming ? (
+              <>
+                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                Claiming...
+              </>
+            ) : (
+              `Claim ${escrowInfo.amount} PYUSD`
+            )}
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const SkeletonCard = () => (
+    <div className="border border-border rounded-xl p-6 animate-pulse">
+      <div className="flex justify-between items-start mb-4">
+        <div className="space-y-2 flex-1">
+          <div className="h-6 bg-bg-secondary rounded w-1/3"></div>
+          <div className="h-4 bg-bg-secondary rounded w-1/4"></div>
+        </div>
+        <div className="h-4 bg-bg-secondary rounded w-32"></div>
+      </div>
+      <div className="flex gap-2">
+        <div className="h-8 bg-bg-secondary rounded-full w-20"></div>
+        <div className="h-8 bg-bg-secondary rounded-full w-24"></div>
+        <div className="h-8 bg-bg-secondary rounded-full w-16"></div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Your Work Passport</h1>
-          <p className="text-text-secondary">Manage your verifiable credentials</p>
+          <p className="text-text-secondary">Manage your verifiable credentials and work history</p>
         </div>
 
-        <div className="mb-6">
+        {/* GitHub Section */}
+        <div className="mb-8">
           {githubLoading ? (
-            <div className="px-6 py-3 border border-border rounded-lg text-center text-text-secondary">
-              Loading GitHub data...
+            <div className="border border-border rounded-xl p-6 animate-pulse">
+              <div className="h-8 bg-bg-secondary rounded w-48 mb-4"></div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="h-24 bg-bg-secondary rounded"></div>
+                <div className="h-24 bg-bg-secondary rounded"></div>
+                <div className="h-24 bg-bg-secondary rounded"></div>
+              </div>
             </div>
           ) : !githubData ? (
             <a 
               href="/api/auth/github"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors"
+              className="flex items-center gap-3 px-6 py-4 border border-border hover:border-text-secondary rounded-xl transition-all group"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              Connect GitHub Account
+              <Github className="w-6 h-6 group-hover:text-text-primary transition-colors" />
+              <div>
+                <h3 className="font-semibold">Connect GitHub</h3>
+                <p className="text-sm text-text-secondary">Automatically generate credentials from your repositories</p>
+              </div>
             </a>
           ) : (
-            <div className="border border-border rounded-xl p-6 mb-8">
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold mb-1">GitHub Profile</h3>
-                <p className="text-sm text-text-secondary">@{githubData.user.login}</p>
+            <div className="border border-border rounded-xl p-6">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-full bg-bg-secondary border border-border flex items-center justify-center">
+                  <Github className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">GitHub Profile</h3>
+                  <p className="text-sm text-text-secondary">@{githubData.user.login}</p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-4 gap-4 mb-6">
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">{githubData.repos.length}</div>
-                  <div className="text-sm text-text-secondary">Total Repositories</div>
+                  <div className="text-xs text-text-secondary">Repositories</div>
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
-                  <div className="text-2xl font-bold mb-1">
-                    {githubData.totalCommits}+
-                  </div>
-                  <div className="text-sm text-text-secondary">Total Commits</div>
+                  <div className="text-2xl font-bold mb-1">{githubData.totalCommits}+</div>
+                  <div className="text-xs text-text-secondary">Commits</div>
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {new Set(githubData.repos.map((r: any) => r.language).filter(Boolean)).size}
                   </div>
-                  <div className="text-sm text-text-secondary">Languages Used</div>
+                  <div className="text-xs text-text-secondary">Languages</div>
+                </div>
+                <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
+                  <div className="text-2xl font-bold mb-1">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {githubData.repos.reduce((sum: number, r: any) => sum + (r.stargazers_count || 0), 0)}
+                  </div>
+                  <div className="text-xs text-text-secondary flex items-center gap-1">
+                    <Star className="w-3 h-3" /> Stars
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-6">
+              {/* Languages */}
+              <div className="mb-6">
                 <h4 className="text-sm font-semibold mb-3">Top Languages</h4>
                 <div className="flex gap-2 flex-wrap">
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -203,27 +326,30 @@ export default function WorkerPage() {
                 </div>
               </div>
 
-              <div className="mt-6">
+              {/* Contribution Graph */}
+              <div>
                 <h4 className="text-sm font-semibold mb-3">Contribution Activity (Last 12 Months)</h4>
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={githubData.contributionsTimeline}>
                     <XAxis 
                       dataKey="month" 
                       stroke="#71717a"
-                      style={{ fontSize: '12px' }}
+                      style={{ fontSize: '11px' }}
                     />
                     <YAxis 
                       stroke="#71717a"
-                      style={{ fontSize: '12px' }}
+                      style={{ fontSize: '11px' }}
                     />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: '#18181b', 
                         border: '1px solid #27272a',
-                        borderRadius: '8px'
+                        borderRadius: '8px',
+                        fontSize: '12px'
                       }}
+                      cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                     />
-                    <Bar dataKey="commits" fill="#ffffff" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="commits" fill="#22c55e" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -231,29 +357,11 @@ export default function WorkerPage() {
           )}
         </div>
 
-        <div className="mb-8">
-          <div className="flex gap-4">
-            <input 
-              type="text"
-              placeholder="Enter your wallet address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="flex-1 px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
-            />
-            <button 
-              onClick={() => fetchCredentials(address)}
-              disabled={loading}
-              className="px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Loading...' : 'Load Credentials'}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="p-6 border border-border rounded-xl bg-bg-secondary/30">
             <div className="text-3xl font-bold mb-1">{credentials.length}</div>
-            <div className="text-sm text-text-secondary">Credentials</div>
+            <div className="text-sm text-text-secondary">Total Credentials</div>
           </div>
           <div className="p-6 border border-border rounded-xl bg-bg-secondary/30">
             <div className="text-3xl font-bold mb-1">
@@ -261,83 +369,58 @@ export default function WorkerPage() {
             </div>
             <div className="text-sm text-text-secondary">Employers</div>
           </div>
-          <div className="p-6 border border-border rounded-xl bg-bg-secondary/30">
-            <div className="text-3xl font-bold mb-1">0</div>
-            <div className="text-sm text-text-secondary">Verifications</div>
-          </div>
         </div>
 
-        {credentials.length > 0 ? (
+        {/* Credentials */}
+        {loading ? (
+          <div className="space-y-4">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : credentials.length > 0 ? (
           <div className="space-y-4">
             {credentials.map((cred) => {
               const isGitHubCredential = cred.company.includes('GitHub (@')
               
-              if (isGitHubCredential) {
-                return (
-                  <div key={cred.id} className="border border-border rounded-xl p-6 bg-gradient-to-br from-bg-secondary/50 to-bg-secondary/20">
-                    <div className="flex items-center gap-3 mb-4">
-                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                      </svg>
-                      <div>
-                        <h3 className="text-lg font-semibold">GitHub Profile Connected</h3>
-                        <p className="text-sm text-text-secondary">{cred.company}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="p-3 bg-bg-primary rounded-lg">
-                        <div className="text-sm text-text-secondary">Languages</div>
-                        <div className="text-lg font-semibold">{cred.skills.length}</div>
-                      </div>
-                      <div className="p-3 bg-bg-primary rounded-lg">
-                        <div className="text-sm text-text-secondary">Skills</div>
-                        <div className="flex gap-1 flex-wrap mt-1">
-                          {cred.skills.slice(0, 3).map((skill: string, i: number) => (
-                            <span key={i} className="text-xs px-2 py-1 bg-bg-secondary border border-border rounded-full">
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-bg-primary rounded-lg">
-                        <div className="text-sm text-text-secondary">Verified</div>
-                        <div className="text-lg font-semibold">✓</div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              } else {
-                return (
-                  <div key={cred.id} className="border border-border rounded-xl p-6">
-                    <div className="flex justify-between items-start mb-4">
+              return (
+                <div 
+                  key={cred.id} 
+                  className="border border-border rounded-xl p-6"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      {isGitHubCredential && (
+                        <Github className="w-5 h-5 text-text-secondary" />
+                      )}
                       <div>
                         <h3 className="text-lg font-semibold">{cred.position}</h3>
-                        <p className="text-text-secondary">{cred.company}</p>
-                      </div>
-                      <div className="text-sm text-text-secondary">
-                        {cred.start_date} - {cred.end_date || 'Present'}
+                        <p className="text-text-secondary text-sm">{cred.company}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {cred.skills.map((skill: string, i: number) => (
-                        <span 
-                          key={i}
-                          className="px-3 py-1 bg-bg-secondary border border-border rounded-full text-sm"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                    <div className="text-sm text-text-secondary">
+                      {cred.start_date} - {cred.end_date || 'Present'}
                     </div>
                   </div>
-                )
-              }
+                  <div className="flex gap-2 flex-wrap">
+                    {cred.skills.map((skill: string, i: number) => (
+                      <span 
+                        key={i}
+                        className="px-3 py-1 bg-bg-secondary border border-border rounded-full text-sm"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                  {!isGitHubCredential && <ClaimButton cred={cred} />}
+                </div>
+              )
             })}
           </div>
         ) : (
           <div className="border border-border rounded-xl p-12 text-center">
             <FileText className="w-12 h-12 text-text-secondary mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No credentials yet</h3>
-            <p className="text-sm text-text-secondary">Enter your address above to load credentials</p>
+            <p className="text-sm text-text-secondary">Connect your GitHub or wait for employers to issue credentials</p>
           </div>
         )}
       </div>
