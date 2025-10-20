@@ -3,9 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
 import { FileText, CheckCircle2, Github, Star } from 'lucide-react'
-import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
-import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
@@ -14,7 +12,6 @@ export default function WorkerPage() {
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [githubData, setGithubData] = useState<{ 
     user: { login: string }, 
     repos: any[], 
@@ -60,60 +57,6 @@ export default function WorkerPage() {
     setLoading(false)
   }
 
-  const autoGenerateGitHubCredential = async (githubData: any, walletAddress: string) => {
-    try {
-      const { data: existing } = await supabase
-        .from('credentials')
-        .select('*')
-        .ilike('worker_address', walletAddress)
-        .ilike('company', '%GitHub (@%')
-      
-      if (existing && existing.length > 0) {
-        return
-      }
-      
-      const credential = generateGitHubCredential(githubData, walletAddress)
-      
-      if (typeof window.ethereum === 'undefined') return
-      
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      
-      const message = createCredentialMessage({
-        worker_address: credential.worker_address,
-        issuer_address: await signer.getAddress(),
-        position: credential.position,
-        company: credential.company,
-        start_date: credential.start_date,
-        end_date: credential.end_date,
-        skills: credential.skills,
-        created_at: new Date().toISOString()
-      })
-      
-      const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
-      const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
-      
-      await supabase.from('credentials').insert([{
-        worker_address: credential.worker_address,
-        issuer_address: await signer.getAddress(),
-        position: credential.position,
-        company: credential.company,
-        start_date: credential.start_date,
-        end_date: credential.end_date || null,
-        skills: credential.skills,
-        created_at: new Date().toISOString(),
-        credential_hash: credentialHash,
-        signature: signature,
-        signed_message: JSON.stringify(message)
-      }])
-      
-      fetchCredentials(walletAddress)
-      
-    } catch (error) {
-      console.error('Failed to auto-generate credential:', error)
-    }
-  }
-
   const fetchGitHubData = async (walletAddress: string) => {
     const cached = getCachedGitHubData(walletAddress)
     
@@ -132,8 +75,6 @@ export default function WorkerPage() {
         
         setGithubData(freshData)
         setCachedGitHubData(walletAddress, freshData)
-        
-        await autoGenerateGitHubCredential(freshData, walletAddress)
       }
     } catch (error) {
       console.error('Failed to fetch GitHub data:', error)
@@ -247,7 +188,6 @@ export default function WorkerPage() {
           <p className="text-text-secondary">Manage your verifiable credentials and work history</p>
         </div>
 
-        {/* GitHub Section */}
         <div className="mb-8">
           {githubLoading ? (
             <div className="border border-border rounded-xl p-6 animate-pulse">
@@ -271,7 +211,6 @@ export default function WorkerPage() {
             </a>
           ) : (
             <div className="border border-border rounded-xl p-6">
-              {/* Header */}
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 rounded-full bg-bg-secondary border border-border flex items-center justify-center">
                   <Github className="w-6 h-6" />
@@ -282,7 +221,6 @@ export default function WorkerPage() {
                 </div>
               </div>
 
-              {/* Stats Grid */}
               <div className="grid grid-cols-4 gap-4 mb-6">
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">{githubData.repos.length}</div>
@@ -294,14 +232,12 @@ export default function WorkerPage() {
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {new Set(githubData.repos.map((r: any) => r.language).filter(Boolean)).size}
                   </div>
                   <div className="text-xs text-text-secondary">Languages</div>
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {githubData.repos.reduce((sum: number, r: any) => sum + (r.stargazers_count || 0), 0)}
                   </div>
                   <div className="text-xs text-text-secondary flex items-center gap-1">
@@ -310,11 +246,9 @@ export default function WorkerPage() {
                 </div>
               </div>
 
-              {/* Languages */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold mb-3">Top Languages</h4>
                 <div className="flex gap-2 flex-wrap">
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {Array.from(new Set(githubData.repos.map((r: any) => r.language).filter(Boolean))).slice(0, 8).map((lang: any, i: number) => (
                     <span 
                       key={i}
@@ -326,7 +260,6 @@ export default function WorkerPage() {
                 </div>
               </div>
 
-              {/* Contribution Graph */}
               <div>
                 <h4 className="text-sm font-semibold mb-3">Contribution Activity (Last 12 Months)</h4>
                 <ResponsiveContainer width="100%" height={180}>
@@ -357,7 +290,6 @@ export default function WorkerPage() {
           )}
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="p-6 border border-border rounded-xl bg-bg-secondary/30">
             <div className="text-3xl font-bold mb-1">{credentials.length}</div>
@@ -371,7 +303,6 @@ export default function WorkerPage() {
           </div>
         </div>
 
-        {/* Credentials */}
         {loading ? (
           <div className="space-y-4">
             <SkeletonCard />
@@ -381,6 +312,7 @@ export default function WorkerPage() {
           <div className="space-y-4">
             {credentials.map((cred) => {
               const isGitHubCredential = cred.company.includes('GitHub (@')
+              if (isGitHubCredential) return null
               
               return (
                 <div 
@@ -388,14 +320,9 @@ export default function WorkerPage() {
                   className="border border-border rounded-xl p-6"
                 >
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      {isGitHubCredential && (
-                        <Github className="w-5 h-5 text-text-secondary" />
-                      )}
-                      <div>
-                        <h3 className="text-lg font-semibold">{cred.position}</h3>
-                        <p className="text-text-secondary text-sm">{cred.company}</p>
-                      </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">{cred.position}</h3>
+                      <p className="text-text-secondary text-sm">{cred.company}</p>
                     </div>
                     <div className="text-sm text-text-secondary">
                       {cred.start_date} - {cred.end_date || 'Present'}
@@ -411,7 +338,7 @@ export default function WorkerPage() {
                       </span>
                     ))}
                   </div>
-                  {!isGitHubCredential && <ClaimButton cred={cred} />}
+                  <ClaimButton cred={cred} />
                 </div>
               )
             })}

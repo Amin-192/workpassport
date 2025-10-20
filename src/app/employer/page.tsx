@@ -4,6 +4,7 @@ import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
 import { CONTRACT_ADDRESS, CONTRACT_ABI, ESCROW_ADDRESS, ESCROW_ABI, PYUSD_ADDRESS, PYUSD_ABI } from '@/lib/contract'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
+import { encryptCredentialField } from '@/lib/litEncryption'
 
 export default function EmployerPage() {
   const [formData, setFormData] = useState({
@@ -13,7 +14,8 @@ export default function EmployerPage() {
     startDate: '',
     endDate: '',
     skills: '',
-    paymentAmount: ''
+    paymentAmount: '',
+    salary: ''
   })
   const [loading, setLoading] = useState(false)
   const [txHash, setTxHash] = useState('')
@@ -49,33 +51,37 @@ export default function EmployerPage() {
         created_at: createdAt
       }
 
-      // Sign credential
+      let salaryEncrypted = null
+      if (formData.salary && formData.salary.trim() !== '') {
+        setStatus('Encrypting salary with Lit Protocol...')
+        salaryEncrypted = await encryptCredentialField(
+          formData.salary,
+          formData.workerAddress
+        )
+      }
+
       setStatus('Signing credential...')
       const message = createCredentialMessage(credential)
       const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
       const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
       const signedMessage = JSON.stringify(message)
 
-      // Store hash on blockchain
       setStatus('Storing credential on blockchain...')
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer)
       const tx = await contract.issueCredential(formData.workerAddress, credentialHash)
       await tx.wait()
       setTxHash(tx.hash)
 
-      // Handle PYUSD payment if amount specified
       if (formData.paymentAmount && parseFloat(formData.paymentAmount) > 0) {
         setStatus('Processing PYUSD payment...')
         
-        const amount = ethers.parseUnits(formData.paymentAmount, 6) // PYUSD has 6 decimals
+        const amount = ethers.parseUnits(formData.paymentAmount, 6)
         
-        // Approve PYUSD
         setStatus('Approving PYUSD...')
         const pyusd = new ethers.Contract(PYUSD_ADDRESS, PYUSD_ABI, signer)
         const approveTx = await pyusd.approve(ESCROW_ADDRESS, amount)
         await approveTx.wait()
         
-        // Deposit to escrow
         setStatus('Depositing to escrow...')
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
         const depositTx = await escrow.depositPayment(
@@ -86,7 +92,6 @@ export default function EmployerPage() {
         await depositTx.wait()
       }
 
-      // Save to Supabase
       setStatus('Saving to database...')
       const { error } = await supabase
         .from('credentials')
@@ -94,7 +99,8 @@ export default function EmployerPage() {
           ...credential,
           credential_hash: credentialHash,
           signature: signature,
-          signed_message: signedMessage
+          signed_message: signedMessage,
+          salary_encrypted: salaryEncrypted
         }])
 
       if (error) throw error
@@ -108,7 +114,8 @@ export default function EmployerPage() {
         startDate: '',
         endDate: '',
         skills: '',
-        paymentAmount: ''
+        paymentAmount: '',
+        salary: ''
       })
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -127,12 +134,12 @@ export default function EmployerPage() {
           <p className="text-text-secondary">Sign work credentials and escrow payment</p>
         </div>
 
-            {status && (
-              <div className="mb-6 p-4 border border-green-500/50 rounded-lg bg-green-500/10 flex items-center gap-3">
-                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-medium text-green-500">{status}</p>
-              </div>
-            )}
+        {status && (
+          <div className="mb-6 p-4 border border-green-500/50 rounded-lg bg-green-500/10 flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm font-medium text-green-500">{status}</p>
+          </div>
+        )}
 
         {txHash && (
           <div className="mb-6 p-4 border border-border rounded-lg bg-bg-secondary">
@@ -221,6 +228,18 @@ export default function EmployerPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium mb-2">Salary (optional)</label>
+              <input 
+                type="text"
+                value={formData.salary}
+                onChange={(e) => setFormData({...formData, salary: e.target.value})}
+                placeholder="$150,000"
+                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+              />
+              <p className="text-xs text-text-secondary mt-1">Will be encrypted with Lit Protocol - only worker can decrypt</p>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium mb-2">Payment Amount (PYUSD) - Optional</label>
               <input 
                 type="number"
@@ -233,18 +252,18 @@ export default function EmployerPage() {
               <p className="text-xs text-text-secondary mt-1">Leave empty to issue credential without payment</p>
             </div>
 
-              <button 
-                type="submit"
-                disabled={loading}
-                className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                    {status || 'Processing...'}
-                  </span>
-                ) : 'Sign & Issue Credential'}
-              </button>
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                  {status || 'Processing...'}
+                </span>
+              ) : 'Sign & Issue Credential'}
+            </button>
           </form>
         </div>
       </div>
