@@ -4,16 +4,25 @@ import Link from "next/link"
 import Image from "next/image"
 import WalletConnect from "../WalletConnect"
 import { ethers } from 'ethers'
+import { supabase } from '@/lib/supabase'
 
 export default function Navigation() {
   const [userRole, setUserRole] = useState<'worker' | 'employer' | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     checkRole()
     
     // Recheck role when storage changes (in case of role selection)
     window.addEventListener('storage', checkRole)
-    return () => window.removeEventListener('storage', checkRole)
+    
+    // Also check on focus in case user switched wallets in MetaMask
+    window.addEventListener('focus', checkRole)
+    
+    return () => {
+      window.removeEventListener('storage', checkRole)
+      window.removeEventListener('focus', checkRole)
+    }
   }, [])
 
   const checkRole = async () => {
@@ -24,19 +33,52 @@ export default function Navigation() {
         
         if (accounts.length > 0) {
           const address = await accounts[0].getAddress()
-          const role = localStorage.getItem(`role_${address}`) as 'worker' | 'employer' | null
-          setUserRole(role)
+          
+          // Check database for role (source of truth)
+          const { data } = await supabase
+            .from('wallet_roles')
+            .select('role')
+            .eq('wallet_address', address.toLowerCase())
+            .single()
+          
+          if (data) {
+            setUserRole(data.role as 'worker' | 'employer')
+            // Sync to localStorage
+            localStorage.setItem(`role_${address}`, data.role)
+          } else {
+            setUserRole(null)
+          }
         } else {
           setUserRole(null)
         }
       } catch (error) {
         console.error('Failed to check role:', error)
+        setUserRole(null)
       }
+    } else {
+      setUserRole(null)
     }
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <nav className=" bg-bg-primary">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex justify-between items-center">
+            <Link href="/" className="flex items-center group">
+              <Image src="/logo.png" alt="WorkPassport" width={50} height={50} />
+              <Image src="/workpassport.png" alt="WorkPassport" width={190} height={90} />
+            </Link>
+            <div className="h-10 w-32 bg-bg-secondary animate-pulse rounded-lg"></div>
+          </div>
+        </div>
+      </nav>
+    )
   }
 
   return (
-    <nav className="border-b border-border bg-bg-primary">
+    <nav className=" bg-bg-primary">
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center group">
