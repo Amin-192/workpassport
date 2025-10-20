@@ -1,8 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText, CheckCircle2, Github, Star } from 'lucide-react'
+import { FileText, CheckCircle2, Github, Star, Loader2, User, Briefcase } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
@@ -11,9 +12,12 @@ import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
 
 export default function WorkerPage() {
+  const router = useRouter()
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [showRoleSelector, setShowRoleSelector] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<'worker' | 'employer' | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [githubData, setGithubData] = useState<{ 
     user: { login: string }, 
@@ -30,10 +34,29 @@ export default function WorkerPage() {
         try {
           const provider = new ethers.BrowserProvider(window.ethereum)
           const accounts = await provider.send("eth_requestAccounts", [])
+          
           if (accounts[0]) {
-            setAddress(accounts[0])
-            await fetchCredentials(accounts[0])
-            fetchGitHubData(accounts[0])
+            const walletAddress = accounts[0]
+            setAddress(walletAddress)
+            
+            // Check if this wallet already has a role
+            const storedRole = localStorage.getItem(`role_${walletAddress}`)
+            
+            if (storedRole) {
+              // Role already set for this wallet
+              if (storedRole === 'employer') {
+                // This wallet is an employer, redirect
+                router.push('/employer')
+                return
+              }
+              // Continue as worker
+              await fetchCredentials(walletAddress)
+              fetchGitHubData(walletAddress)
+            } else {
+              // No role set, need to choose
+              setShowRoleSelector(true)
+              setLoading(false)
+            }
           }
         } catch (error) {
           console.error('Failed to load wallet:', error)
@@ -45,7 +68,23 @@ export default function WorkerPage() {
     }
     
     loadWalletAddress()
-  }, [])
+  }, [router])
+
+  const handleRoleSelect = async (role: 'worker' | 'employer') => {
+    if (!address) return
+    
+    // Store role permanently for this wallet
+    localStorage.setItem(`role_${address}`, role)
+    
+    if (role === 'employer') {
+      router.push('/employer')
+    } else {
+      setShowRoleSelector(false)
+      setLoading(true)
+      await fetchCredentials(address)
+      fetchGitHubData(address)
+    }
+  }
 
   const fetchCredentials = async (workerAddress: string) => {
     setLoading(true)
@@ -210,7 +249,7 @@ export default function WorkerPage() {
           >
             {claiming ? (
               <>
-                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                <Loader2 className="w-4 h-4 animate-spin" />
                 Claiming...
               </>
             ) : (
@@ -238,6 +277,63 @@ export default function WorkerPage() {
       </div>
     </div>
   )
+
+  // Role Selector Modal
+  if (showRoleSelector) {
+    return (
+      <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+        <div className="bg-bg-primary border border-border rounded-xl p-8 max-w-md w-full">
+          <h2 className="text-2xl font-bold mb-2">Choose Your Role</h2>
+          <p className="text-text-secondary text-sm mb-2">
+            Select how you'll use WorkPassport
+          </p>
+          <p className="text-yellow-500 text-xs mb-6">
+            ⚠️ This choice is permanent for this wallet address
+          </p>
+
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <button
+              onClick={() => setSelectedRole('worker')}
+              className={`p-6 border-2 rounded-xl transition-all ${
+                selectedRole === 'worker'
+                  ? 'border-white bg-white/5'
+                  : 'border-border hover:border-text-secondary'
+              }`}
+            >
+              <User className="w-8 h-8 mx-auto mb-3" />
+              <div className="font-semibold mb-1">Worker</div>
+              <div className="text-xs text-text-secondary">
+                Manage credentials
+              </div>
+            </button>
+
+            <button
+              onClick={() => setSelectedRole('employer')}
+              className={`p-6 border-2 rounded-xl transition-all ${
+                selectedRole === 'employer'
+                  ? 'border-white bg-white/5'
+                  : 'border-border hover:border-text-secondary'
+              }`}
+            >
+              <Briefcase className="w-8 h-8 mx-auto mb-3" />
+              <div className="font-semibold mb-1">Employer</div>
+              <div className="text-xs text-text-secondary">
+                Issue credentials
+              </div>
+            </button>
+          </div>
+
+          <button
+            onClick={() => selectedRole && handleRoleSelect(selectedRole)}
+            disabled={!selectedRole}
+            className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Confirm Role
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
