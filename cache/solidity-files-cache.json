@@ -36,6 +36,43 @@
       "artifacts": [
         "WorkPassport"
       ]
+    },
+    "/Users/evenrussom/workpassport/contracts/PaymentEscrow.sol": {
+      "lastModificationDate": 1760892322746,
+      "contentHash": "b91e656c9b2728561d3d46fc29b25147",
+      "sourceName": "contracts/PaymentEscrow.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.28"
+      ],
+      "artifacts": [
+        "IERC20",
+        "PaymentEscrow"
+      ]
     }
   }
 }

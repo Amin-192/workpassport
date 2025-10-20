@@ -39,6 +39,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/recharts": "^1.8.29",
     "chai": "^4.5.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",

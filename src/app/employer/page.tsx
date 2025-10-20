@@ -2,8 +2,9 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
+import { CONTRACT_ADDRESS, CONTRACT_ABI, ESCROW_ADDRESS, ESCROW_ABI, PYUSD_ADDRESS, PYUSD_ABI } from '@/lib/contract'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
+
 export default function EmployerPage() {
   const [formData, setFormData] = useState({
     workerAddress: '',
@@ -11,15 +12,18 @@ export default function EmployerPage() {
     company: '',
     startDate: '',
     endDate: '',
-    skills: ''
+    skills: '',
+    paymentAmount: ''
   })
   const [loading, setLoading] = useState(false)
   const [txHash, setTxHash] = useState('')
+  const [status, setStatus] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setTxHash('')
+    setStatus('')
 
     try {
       if (typeof window.ethereum === 'undefined') {
@@ -34,7 +38,6 @@ export default function EmployerPage() {
 
       const createdAt = new Date().toISOString()
 
-      // Create credential object
       const credential = {
         worker_address: formData.workerAddress,
         issuer_address: issuerAddress,
@@ -46,33 +49,57 @@ export default function EmployerPage() {
         created_at: createdAt
       }
 
-      /// Sign credential with EIP-712
+      // Sign credential
+      setStatus('Signing credential...')
       const message = createCredentialMessage(credential)
       const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
-
-      // Generate hash from typed data
       const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
       const signedMessage = JSON.stringify(message)
 
       // Store hash on blockchain
+      setStatus('Storing credential on blockchain...')
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer)
       const tx = await contract.issueCredential(formData.workerAddress, credentialHash)
       await tx.wait()
-      
       setTxHash(tx.hash)
 
+      // Handle PYUSD payment if amount specified
+      if (formData.paymentAmount && parseFloat(formData.paymentAmount) > 0) {
+        setStatus('Processing PYUSD payment...')
+        
+        const amount = ethers.parseUnits(formData.paymentAmount, 6) // PYUSD has 6 decimals
+        
+        // Approve PYUSD
+        setStatus('Approving PYUSD...')
+        const pyusd = new ethers.Contract(PYUSD_ADDRESS, PYUSD_ABI, signer)
+        const approveTx = await pyusd.approve(ESCROW_ADDRESS, amount)
+        await approveTx.wait()
+        
+        // Deposit to escrow
+        setStatus('Depositing to escrow...')
+        const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
+        const depositTx = await escrow.depositPayment(
+          formData.workerAddress,
+          credentialHash,
+          amount
+        )
+        await depositTx.wait()
+      }
+
       // Save to Supabase
+      setStatus('Saving to database...')
       const { error } = await supabase
         .from('credentials')
         .insert([{
           ...credential,
           credential_hash: credentialHash,
           signature: signature,
-         signed_message: signedMessage 
+          signed_message: signedMessage
         }])
 
       if (error) throw error
 
+      setStatus('Success!')
       alert('Credential issued successfully!')
       setFormData({
         workerAddress: '',
@@ -80,13 +107,15 @@ export default function EmployerPage() {
         company: '',
         startDate: '',
         endDate: '',
-        skills: ''
+        skills: '',
+        paymentAmount: ''
       })
     } catch (error: unknown) {
-     const message = error instanceof Error ? error.message : 'Unknown error'
+      const message = error instanceof Error ? error.message : 'Unknown error'
       alert('Failed to issue credential: ' + message)
     } finally {
       setLoading(false)
+      setStatus('')
     }
   }
 
@@ -95,8 +124,15 @@ export default function EmployerPage() {
       <div className="max-w-4xl mx-auto px-6 py-12">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Issue Credentials</h1>
-          <p className="text-text-secondary">Sign work credentials for your employees</p>
+          <p className="text-text-secondary">Sign work credentials and escrow payment</p>
         </div>
+
+            {status && (
+              <div className="mb-6 p-4 border border-green-500/50 rounded-lg bg-green-500/10 flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm font-medium text-green-500">{status}</p>
+              </div>
+            )}
 
         {txHash && (
           <div className="mb-6 p-4 border border-border rounded-lg bg-bg-secondary">
@@ -184,13 +220,31 @@ export default function EmployerPage() {
               />
             </div>
 
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Signing & Storing on Blockchain...' : 'Sign & Issue Credential'}
-            </button>
+            <div>
+              <label className="block text-sm font-medium mb-2">Payment Amount (PYUSD) - Optional</label>
+              <input 
+                type="number"
+                step="0.01"
+                value={formData.paymentAmount}
+                onChange={(e) => setFormData({...formData, paymentAmount: e.target.value})}
+                placeholder="100.00"
+                className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-text-secondary transition-colors"
+              />
+              <p className="text-xs text-text-secondary mt-1">Leave empty to issue credential without payment</p>
+            </div>
+
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full px-6 py-3 bg-white text-black rounded-lg font-medium hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    {status || 'Processing...'}
+                  </span>
+                ) : 'Sign & Issue Credential'}
+              </button>
           </form>
         </div>
       </div>
