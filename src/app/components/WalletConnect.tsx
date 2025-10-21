@@ -8,20 +8,17 @@ export default function WalletConnect() {
   const [connecting, setConnecting] = useState(false)
 
   useEffect(() => {
-    // Only check connection if user hasn't explicitly disconnected
     const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
     if (!hasDisconnected) {
       checkConnection()
     }
     
-    // Listen for account changes
     if (typeof window.ethereum !== 'undefined' && window.ethereum.on) {
       const handleAccountsChanged = (...args: unknown[]) => {
         const accounts = args[0] as string[]
         if (accounts.length === 0) {
           handleDisconnect()
         } else {
-          // Clear disconnect flag when user connects via MetaMask
           sessionStorage.removeItem('wallet_disconnected')
           setAddress(accounts[0])
           window.location.reload()
@@ -47,16 +44,16 @@ export default function WalletConnect() {
   const handleDisconnect = () => {
     setAddress(null)
     
-    // Set flag that user explicitly disconnected
     sessionStorage.setItem('wallet_disconnected', 'true')
     
-    // Clear all role data
     const keys = Object.keys(localStorage)
     keys.forEach(key => {
       if (key.startsWith('role_')) {
         localStorage.removeItem(key)
       }
     })
+    
+    window.dispatchEvent(new Event('wallet-disconnected'))
     
     window.location.href = '/'
   }
@@ -83,7 +80,6 @@ export default function WalletConnect() {
         return
       }
 
-      // Clear disconnect flag when user explicitly connects
       sessionStorage.removeItem('wallet_disconnected')
 
       const provider = new ethers.BrowserProvider(window.ethereum)
