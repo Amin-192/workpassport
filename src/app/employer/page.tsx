@@ -8,6 +8,7 @@ import RoleSelector from '../components/RoleSelector'
 import EmployerSidebar from '../components/employer/EmployerSidebar'
 import DashboardView from '../components/employer/DashboardView'
 import IssueCredentialView from '../components/employer/IssueCredentialView'
+import AllCredentialsView from '../components/employer/AllCredentialsView'
 
 export default function EmployerPage() {
   const router = useRouter()
@@ -154,11 +155,9 @@ export default function EmployerPage() {
           />
         )}
         
-        {activeView === 'all' && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold mb-4">All Credentials</h2>
-          </div>
-        )}
+{activeView === 'all' && (
+  <AllCredentialsView issuerAddress={address} />
+)}
       </div>
     </div>
   )
