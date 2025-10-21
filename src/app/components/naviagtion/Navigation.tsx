@@ -117,7 +117,7 @@ export default function Navigation() {
   }
 
   return (
-    <nav className="border-b border-border bg-bg-primary">
+    <nav className=" bg-bg-primary">
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center group">
