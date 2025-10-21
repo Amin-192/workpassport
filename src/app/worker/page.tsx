@@ -18,7 +18,6 @@ export default function WorkerPage() {
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [showRoleSelector, setShowRoleSelector] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [githubData, setGithubData] = useState<{ 
     user: { login: string }, 
     repos: any[], 
@@ -33,17 +32,20 @@ export default function WorkerPage() {
   }, [router])
 
   const checkExistingConnection = async () => {
+      const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
+  if (hasDisconnected) {
+    setLoading(false)
+    return
+  }
     if (typeof window.ethereum !== 'undefined') {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum)
-        // Use listAccounts instead of eth_requestAccounts to avoid triggering MetaMask
         const accounts = await provider.listAccounts()
         
         if (accounts.length > 0) {
           const walletAddress = await accounts[0].getAddress()
           setAddress(walletAddress)
           
-          // Check database first (source of truth)
           const { data: dbRole } = await supabase
             .from('wallet_roles')
             .select('role')
@@ -51,26 +53,21 @@ export default function WorkerPage() {
             .single()
           
           if (dbRole) {
-            // Role exists in database
             const role = dbRole.role
             
-            // Sync to localStorage
             localStorage.setItem(`role_${walletAddress}`, role)
             
             if (role === 'employer') {
               router.push('/employer')
               return
             }
-            // Continue as worker
             await fetchCredentials(walletAddress)
             fetchGitHubData(walletAddress)
           } else {
-            // No role in database, show selector
             setShowRoleSelector(true)
             setLoading(false)
           }
         } else {
-          // No wallet connected
           setLoading(false)
         }
       } catch (error) {
@@ -86,7 +83,6 @@ export default function WorkerPage() {
     if (!address) return
     
     try {
-      // Store in database (source of truth)
       const { error } = await supabase
         .from('wallet_roles')
         .insert({
@@ -95,7 +91,6 @@ export default function WorkerPage() {
         })
       
       if (error) {
-        // If error is duplicate key, that means role already exists
         if (error.code === '23505') {
           alert('This wallet already has a role assigned.')
           window.location.reload()
@@ -104,10 +99,8 @@ export default function WorkerPage() {
         throw error
       }
       
-      // Store in localStorage for quick access
       localStorage.setItem(`role_${address}`, role)
       
-      // Trigger storage event for navigation update
       window.dispatchEvent(new Event('storage'))
       
       if (role === 'employer') {
@@ -316,7 +309,6 @@ export default function WorkerPage() {
     </div>
   )
 
-  // If no wallet connected, show connect prompt
   if (!address && !showRoleSelector && !loading) {
     return (
       <div className="min-h-screen bg-bg-primary text-text-primary">
@@ -335,7 +327,6 @@ export default function WorkerPage() {
     )
   }
 
-  // Role Selector Modal
   if (showRoleSelector) {
     return <RoleSelector onSelectRole={handleRoleSelect} />
   }
@@ -395,14 +386,12 @@ export default function WorkerPage() {
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {new Set(githubData.repos.map((r: any) => r.language).filter(Boolean)).size}
                   </div>
                   <div className="text-xs text-text-secondary">Languages</div>
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {githubData.repos.reduce((sum: number, r: any) => sum + (r.stargazers_count || 0), 0)}
                   </div>
                   <div className="text-xs text-text-secondary flex items-center gap-1">
@@ -415,7 +404,6 @@ export default function WorkerPage() {
               <div className="mb-6">
                 <h4 className="text-sm font-semibold mb-3">Top Languages</h4>
                 <div className="flex gap-2 flex-wrap">
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {Array.from(new Set(githubData.repos.map((r: any) => r.language).filter(Boolean))).slice(0, 8).map((lang: any, i: number) => (
                     <span 
                       key={i}
