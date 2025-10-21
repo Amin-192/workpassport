@@ -1,12 +1,18 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
 import { CONTRACT_ADDRESS, CONTRACT_ABI, ESCROW_ADDRESS, ESCROW_ABI, PYUSD_ADDRESS, PYUSD_ABI } from '@/lib/contract'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 import { Briefcase, CheckCircle2, Loader2 } from 'lucide-react'
+import RoleSelector from '../components/RoleSelector'
 
 export default function EmployerPage() {
+  const router = useRouter()
+  const [address, setAddress] = useState<string>('')
+  const [showRoleSelector, setShowRoleSelector] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
   const [formData, setFormData] = useState({
     workerAddress: '',
     position: '',
@@ -23,25 +29,118 @@ export default function EmployerPage() {
   const [loadingRecent, setLoadingRecent] = useState(true)
 
   useEffect(() => {
-    loadRecentCredentials()
-  }, [])
+    checkExistingConnection()
+  }, [router])
 
-  const loadRecentCredentials = async () => {
-    setLoadingRecent(true)
-    if (typeof window.ethereum === 'undefined') {
-      setLoadingRecent(false)
+  const checkExistingConnection = async () => {
+    // Check if user explicitly disconnected
+    const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
+    if (hasDisconnected) {
+      setPageLoading(false)
       return
     }
 
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const accounts = await provider.listAccounts()
+        
+        if (accounts.length > 0) {
+          const walletAddress = await accounts[0].getAddress()
+          setAddress(walletAddress)
+          
+          const { data: dbRole } = await supabase
+            .from('wallet_roles')
+            .select('role')
+            .eq('wallet_address', walletAddress.toLowerCase())
+            .single()
+          
+          if (dbRole) {
+            const role = dbRole.role
+            
+            localStorage.setItem(`role_${walletAddress}`, role)
+            
+            if (role === 'worker') {
+              router.push('/worker')
+              return
+            }
+            setPageLoading(false)
+            loadRecentCredentials(walletAddress)
+          } else {
+            setShowRoleSelector(true)
+            setPageLoading(false)
+          }
+        } else {
+          setPageLoading(false)
+        }
+      } catch (error) {
+        console.error('Failed to check connection:', error)
+        setPageLoading(false)
+      }
+    } else {
+      setPageLoading(false)
+    }
+  }
+
+  const handleRoleSelect = async (role: 'worker' | 'employer') => {
+    if (!address) return
+    
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const issuerAddress = await signer.getAddress()
+      const { error } = await supabase
+        .from('wallet_roles')
+        .insert({
+          wallet_address: address.toLowerCase(),
+          role: role
+        })
+      
+      if (error) {
+        if (error.code === '23505') {
+          alert('This wallet already has a role assigned.')
+          window.location.reload()
+          return
+        }
+        throw error
+      }
+      
+      // Store in localStorage for quick access
+      localStorage.setItem(`role_${address}`, role)
+      
+      // Trigger storage event for navigation update
+      window.dispatchEvent(new Event('storage'))
+      
+      if (role === 'worker') {
+        router.push('/worker')
+      } else {
+        setShowRoleSelector(false)
+        setPageLoading(false)
+        loadRecentCredentials(address)
+      }
+    } catch (error) {
+      console.error('Failed to save role:', error)
+      alert('Failed to save role. Please try again.')
+    }
+  }
+
+  const loadRecentCredentials = async (issuerAddress?: string) => {
+    setLoadingRecent(true)
+    
+    try {
+      let targetAddress = issuerAddress
+      
+      if (!targetAddress) {
+        if (typeof window.ethereum === 'undefined') {
+          setLoadingRecent(false)
+          return
+        }
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const signer = await provider.getSigner()
+        targetAddress = await signer.getAddress()
+      }
 
       const { data, error } = await supabase
         .from('credentials')
         .select('*')
-        .ilike('issuer_address', issuerAddress)
+        .ilike('issuer_address', targetAddress)
         .order('created_at', { ascending: false })
         .limit(5)
 
@@ -85,21 +184,18 @@ export default function EmployerPage() {
         created_at: createdAt
       }
 
-      // Sign credential
       setStatus('Signing credential...')
       const message = createCredentialMessage(credential)
       const signature = await signer.signTypedData(DOMAIN, CREDENTIAL_TYPES, message)
       const credentialHash = ethers.TypedDataEncoder.hash(DOMAIN, CREDENTIAL_TYPES, message)
       const signedMessage = JSON.stringify(message)
 
-      // Store hash on blockchain
       setStatus('Storing credential on blockchain...')
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer)
       const tx = await contract.issueCredential(formData.workerAddress, credentialHash)
       await tx.wait()
       setTxHash(tx.hash)
 
-      // Handle PYUSD payment if amount specified
       if (formData.paymentAmount && parseFloat(formData.paymentAmount) > 0) {
         setStatus('Processing PYUSD payment...')
         
@@ -120,7 +216,6 @@ export default function EmployerPage() {
         await depositTx.wait()
       }
 
-      // Save to Supabase
       setStatus('Saving to database...')
       const { error } = await supabase
         .from('credentials')
@@ -153,6 +248,36 @@ export default function EmployerPage() {
       setLoading(false)
       setStatus('')
     }
+  }
+
+  if (!address && !showRoleSelector && !pageLoading) {
+    return (
+      <div className="min-h-screen bg-bg-primary text-text-primary">
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <div className="border border-border rounded-xl p-12 text-center">
+            <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
+            <p className="text-text-secondary mb-6">
+              Please connect your wallet to issue credentials
+            </p>
+            <p className="text-sm text-text-secondary">
+              Click "Connect Wallet" in the top right corner
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (showRoleSelector) {
+    return <RoleSelector onSelectRole={handleRoleSelect} />
+  }
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-bg-primary text-text-primary flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-text-secondary" />
+      </div>
+    )
   }
 
   return (
