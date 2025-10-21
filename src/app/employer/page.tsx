@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
 import RoleSelector from '../components/RoleSelector'
 import EmployerSidebar from '../components/employer/EmployerSidebar'
+import DashboardView from '../components/employer/DashboardView'
 import IssueCredentialView from '../components/employer/IssueCredentialView'
 
 export default function EmployerPage() {
@@ -13,7 +14,7 @@ export default function EmployerPage() {
   const [address, setAddress] = useState<string>('')
   const [showRoleSelector, setShowRoleSelector] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
-  const [activeView, setActiveView] = useState<'dashboard' | 'issue' | 'all'>('issue')
+  const [activeView, setActiveView] = useState<'dashboard' | 'issue' | 'all'>('dashboard')
 
   useEffect(() => {
     checkExistingConnection()
@@ -137,26 +138,25 @@ export default function EmployerPage() {
       <EmployerSidebar activeView={activeView} onChangeView={setActiveView} />
       
       <div className="flex-1 p-12">
+        {activeView === 'dashboard' && (
+          <DashboardView 
+            issuerAddress={address}
+            onNavigate={setActiveView}
+          />
+        )}
+
         {activeView === 'issue' && (
           <IssueCredentialView 
             issuerAddress={address}
             onCredentialIssued={() => {
-              // Refresh or show success
+              setActiveView('dashboard')
             }}
           />
-        )}
-        
-        {activeView === 'dashboard' && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
-            
-          </div>
         )}
         
         {activeView === 'all' && (
           <div className="text-center py-20">
             <h2 className="text-2xl font-bold mb-4">All Credentials</h2>
-            
           </div>
         )}
       </div>
