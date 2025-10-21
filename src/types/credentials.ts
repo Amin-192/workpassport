@@ -11,6 +11,11 @@ export interface Credential {
   credential_hash: string
   signature: string
   signed_message: string
+  salary_encrypted?: {
+    ciphertext: string
+    dataToEncryptHash: string
+    accessControlConditions: any[]
+  } | null
 }
 
 export interface GitHubCredential {
