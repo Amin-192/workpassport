@@ -1,20 +1,23 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText, CheckCircle2, Github, Star } from 'lucide-react'
+import { FileText, CheckCircle2, Github, Star, Loader2 } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
+import RoleSelector from '../components/RoleSelector'
 
 export default function WorkerPage() {
+  const router = useRouter()
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [showRoleSelector, setShowRoleSelector] = useState(false)
   const [githubData, setGithubData] = useState<{ 
     user: { login: string }, 
     repos: any[], 
@@ -25,27 +28,94 @@ export default function WorkerPage() {
   const [githubLoading, setGithubLoading] = useState(false)
 
   useEffect(() => {
-    const loadWalletAddress = async () => {
-      if (typeof window.ethereum !== 'undefined') {
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum)
-          const accounts = await provider.send("eth_requestAccounts", [])
-          if (accounts[0]) {
-            setAddress(accounts[0])
-            await fetchCredentials(accounts[0])
-            fetchGitHubData(accounts[0])
+    checkExistingConnection()
+  }, [router])
+
+  const checkExistingConnection = async () => {
+      const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
+  if (hasDisconnected) {
+    setLoading(false)
+    return
+  }
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const accounts = await provider.listAccounts()
+        
+        if (accounts.length > 0) {
+          const walletAddress = await accounts[0].getAddress()
+          setAddress(walletAddress)
+          
+          const { data: dbRole } = await supabase
+            .from('wallet_roles')
+            .select('role')
+            .eq('wallet_address', walletAddress.toLowerCase())
+            .single()
+          
+          if (dbRole) {
+            const role = dbRole.role
+            
+            localStorage.setItem(`role_${walletAddress}`, role)
+            
+            if (role === 'employer') {
+              router.push('/employer')
+              return
+            }
+            await fetchCredentials(walletAddress)
+            fetchGitHubData(walletAddress)
+          } else {
+            setShowRoleSelector(true)
+            setLoading(false)
           }
-        } catch (error) {
-          console.error('Failed to load wallet:', error)
+        } else {
           setLoading(false)
         }
-      } else {
+      } catch (error) {
+        console.error('Failed to check connection:', error)
         setLoading(false)
       }
+    } else {
+      setLoading(false)
     }
+  }
+
+  const handleRoleSelect = async (role: 'worker' | 'employer') => {
+    if (!address) return
     
-    loadWalletAddress()
-  }, [])
+    try {
+      const { error } = await supabase
+        .from('wallet_roles')
+        .insert({
+          wallet_address: address.toLowerCase(),
+          role: role
+        })
+      
+      if (error) {
+        if (error.code === '23505') {
+          alert('This wallet already has a role assigned.')
+          window.location.reload()
+          return
+        }
+        throw error
+      }
+      
+      localStorage.setItem(`role_${address}`, role)
+      
+      window.dispatchEvent(new Event('storage'))
+      
+      if (role === 'employer') {
+        router.push('/employer')
+      } else {
+        setShowRoleSelector(false)
+        setLoading(true)
+        await fetchCredentials(address)
+        fetchGitHubData(address)
+      }
+    } catch (error) {
+      console.error('Failed to save role:', error)
+      alert('Failed to save role. Please try again.')
+    }
+  }
 
   const fetchCredentials = async (workerAddress: string) => {
     setLoading(true)
@@ -210,7 +280,7 @@ export default function WorkerPage() {
           >
             {claiming ? (
               <>
-                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                <Loader2 className="w-4 h-4 animate-spin" />
                 Claiming...
               </>
             ) : (
@@ -238,6 +308,28 @@ export default function WorkerPage() {
       </div>
     </div>
   )
+
+  if (!address && !showRoleSelector && !loading) {
+    return (
+      <div className="min-h-screen bg-bg-primary text-text-primary">
+        <div className="max-w-4xl mx-auto px-6 py-12">
+          <div className="border border-border rounded-xl p-12 text-center">
+            <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
+            <p className="text-text-secondary mb-6">
+              Please connect your wallet to access your Work Passport
+            </p>
+            <p className="text-sm text-text-secondary">
+              Click "Connect Wallet" in the top right corner
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (showRoleSelector) {
+    return <RoleSelector onSelectRole={handleRoleSelect} />
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
@@ -294,14 +386,12 @@ export default function WorkerPage() {
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {new Set(githubData.repos.map((r: any) => r.language).filter(Boolean)).size}
                   </div>
                   <div className="text-xs text-text-secondary">Languages</div>
                 </div>
                 <div className="p-4 border border-border rounded-lg bg-bg-secondary/30">
                   <div className="text-2xl font-bold mb-1">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {githubData.repos.reduce((sum: number, r: any) => sum + (r.stargazers_count || 0), 0)}
                   </div>
                   <div className="text-xs text-text-secondary flex items-center gap-1">
@@ -314,7 +404,6 @@ export default function WorkerPage() {
               <div className="mb-6">
                 <h4 className="text-sm font-semibold mb-3">Top Languages</h4>
                 <div className="flex gap-2 flex-wrap">
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                   {Array.from(new Set(githubData.repos.map((r: any) => r.language).filter(Boolean))).slice(0, 8).map((lang: any, i: number) => (
                     <span 
                       key={i}
