@@ -12,7 +12,82 @@ export default function BlockscoutSection() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            <div className="order-2 md:order-1">
+              <div className="p-8 border border-border rounded-2xl bg-bg-primary">
+                <div className="space-y-6">
+                  <TransactionPreview 
+                    type="Credential Issued"
+                    from="Employer"
+                    to="Worker"
+                    status="success"
+                  />
+                  <TransactionPreview 
+                    type="PYUSD Deposited"
+                    from="Employer"
+                    to="Escrow Contract"
+                    status="success"
+                  />
+                  <TransactionPreview 
+                    type="Payment Claimed"
+                    from="Escrow Contract"
+                    to="Worker"
+                    status="pending"
+                  />
+                  
+                  <div className="pt-4 border-t border-border">
+                    <button className="w-full py-3 bg-bg-secondary border border-border rounded-lg text-sm font-medium hover:border-text-secondary transition-colors flex items-center justify-center gap-2">
+                      <img 
+                        src="https://ethglobal.b-cdn.net/organizations/8kguf/square-logo/default.png"
+                        alt="Blockscout"
+                        className="w-4 h-4"
+                      />
+                      View on Blockscout
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="order-1 md:order-2">
+              <div className="flex items-center gap-4 mb-8">
+                <img 
+                  src="https://ethglobal.b-cdn.net/organizations/8kguf/square-logo/default.png"
+                  alt="Blockscout"
+                  className="w-16 h-16"
+                />
+                <div>
+                  <h2 className="text-4xl font-bold">Blockscout</h2>
+                  <p className="text-text-secondary">Transparent Verification</p>
+                </div>
+              </div>
+
+              <p className="text-xl text-text-secondary mb-8 leading-relaxed">
+                Every credential issuance, escrow deposit, and payment claim is{' '}
+                <span className="text-white font-semibold">publicly verifiable</span> on the blockchain. 
+                Blockscout provides the transparency layer that makes trust unnecessary.
+              </p>
+
+              <div className="space-y-6">
+                <FeatureItem 
+                  icon={<Bell className="w-5 h-5" />}
+                  title="Real-Time Notifications"
+                  description="Transaction toast notifications via Blockscout SDK for every on-chain action"
+                />
+                <FeatureItem 
+                  icon={<Eye className="w-5 h-5" />}
+                  title="Transaction History Popup"
+                  description="Workers access complete transaction history with one click"
+                />
+                <FeatureItem 
+                  icon={<Search className="w-5 h-5" />}
+                  title="Issuer Verification"
+                  description="Verify employer addresses directly on Blockscout explorer"
+                />
+              </div>
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>
