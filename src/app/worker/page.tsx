@@ -313,13 +313,18 @@ export default function WorkerPage() {
             <p className="text-text-secondary">Manage your verifiable credentials and work history</p>
           </div>
           {address && (
-            <button
-              onClick={() => openPopup({ chainId: '11155111', address })}
-              className="px-4 py-2 border border-border hover:border-text-secondary rounded-lg transition-colors text-sm"
-            >
-              Transaction History
-            </button>
-          )}
+                <button
+                  onClick={() => openPopup({ chainId: '11155111', address })}
+                  className="flex items-center gap-2 px-4 py-2 border border-border hover:border-text-secondary rounded-lg transition-colors text-sm"
+                >
+                  <img 
+                    src="https://ethglobal.b-cdn.net/organizations/8kguf/square-logo/default.png" 
+                    alt="Blockscout"
+                    className="w-4 h-4"
+                  />
+                  Transaction History
+                </button>
+              )}
         </div>
 
         <div className="mb-8">
