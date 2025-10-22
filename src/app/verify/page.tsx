@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
 import { ethers } from 'ethers'
@@ -8,30 +9,37 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
 import { CREDENTIAL_TYPES, DOMAIN } from '@/lib/eip712'
 
 export default function VerifyPage() {
-  const [address, setAddress] = useState('')
+  const searchParams = useSearchParams()
+  const urlAddress = searchParams.get('address')
+  
+  const [address, setAddress] = useState(urlAddress || '')
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(false)
   const [verified, setVerified] = useState<{[key: string]: boolean}>({})
   const [onChainVerified, setOnChainVerified] = useState<{[key: string]: boolean}>({})
 
   useEffect(() => {
-    const loadWalletAddress = async () => {
-      if (typeof window.ethereum !== 'undefined') {
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum)
-          const accounts = await provider.send("eth_requestAccounts", [])
-          if (accounts[0]) {
-            setAddress(accounts[0])
-            handleVerify(accounts[0])
-          }
-        } catch (error) {
-          console.error('Failed to load wallet:', error)
+    if (urlAddress) {
+      handleVerify(urlAddress)
+    } else {
+      loadWalletAddress()
+    }
+  }, [urlAddress])
+
+  const loadWalletAddress = async () => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const accounts = await provider.send("eth_requestAccounts", [])
+        if (accounts[0]) {
+          setAddress(accounts[0])
+          handleVerify(accounts[0])
         }
+      } catch (error) {
+        console.error('Failed to load wallet:', error)
       }
     }
-    
-    loadWalletAddress()
-  }, [])
+  }
 
   const verifyCredential = async (cred: Credential) => {
     try {

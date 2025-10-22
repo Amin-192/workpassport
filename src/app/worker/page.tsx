@@ -242,7 +242,7 @@ export default function WorkerPage() {
             <button
               onClick={handleClaim}
               disabled={claiming}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-white hover:bg-gray-700 text-black disabled:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
               {claiming ? (
                 <>
@@ -512,7 +512,7 @@ export default function WorkerPage() {
             </div>
             <div className="bg-white p-6 rounded-lg">
               <QRCodeSVG 
-                value={`${window.location.origin}/profile/${address}`}
+                value={`${window.location.origin}/verify?address=${address}`}
                 size={256}
                 level="H"
               />
