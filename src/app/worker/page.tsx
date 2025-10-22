@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
 import RoleSelector from '../components/RoleSelector'
+import { useNotification } from '@blockscout/app-sdk'
 
 export default function WorkerPage() {
   const router = useRouter()
@@ -156,6 +157,7 @@ export default function WorkerPage() {
   }
 
   const ClaimButton = ({ cred }: { cred: Credential }) => {
+    const { openTxToast } = useNotification()
     const [claiming, setClaiming] = useState(false)
     const [escrowInfo, setEscrowInfo] = useState<{amount: string, claimed: boolean} | null>(null)
 
@@ -199,9 +201,19 @@ export default function WorkerPage() {
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
         
         const tx = await escrow.claimPayment(cred.credential_hash)
+        
+        openTxToast('11155111', tx.hash)
+        
         await tx.wait()
         
-        alert('Payment claimed successfully!')
+        await supabase
+          .from('credentials')
+          .update({ 
+            claim_tx_hash: tx.hash,
+            claim_timestamp: new Date().toISOString()
+          })
+          .eq('id', cred.id)
+        
         checkEscrow()
       } catch (error) {
         console.error('Claim failed:', error)
@@ -217,24 +229,30 @@ export default function WorkerPage() {
       <div className="mt-4 pt-4 border-t border-border">
         {escrowInfo.claimed ? (
           <div className="flex items-center gap-2 text-green-500 text-sm">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Payment claimed: {escrowInfo.amount} PYUSD</span>
+            <CheckCircle2 className="w-5 h-5" />
+            <span>Claimed {escrowInfo.amount} PYUSD</span>
           </div>
         ) : (
-          <button
-            onClick={handleClaim}
-            disabled={claiming}
-            className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {claiming ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Claiming...
-              </>
-            ) : (
-              `Claim ${escrowInfo.amount} PYUSD`
-            )}
-          </button>
+          <div className="flex items-center justify-between">
+            <div className="text-sm">
+              <span className="text-text-secondary">Available: </span>
+              <span className="font-semibold text-green-500">{escrowInfo.amount} PYUSD</span>
+            </div>
+            <button
+              onClick={handleClaim}
+              disabled={claiming}
+              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {claiming ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Claiming...
+                </>
+              ) : (
+                'Claim PYUSD'
+              )}
+            </button>
+          </div>
         )}
       </div>
     )

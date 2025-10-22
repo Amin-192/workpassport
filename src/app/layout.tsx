@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "./components/naviagtion/Navigation";
-import { NotificationProvider, TransactionPopupProvider } from '@blockscout/app-sdk'
-import '@blockscout/app-sdk/dist/style.css'
+import BlockscoutProvider from "./components/BlockscoutProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,12 +29,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <NotificationProvider>
-          <TransactionPopupProvider>
-            <Navigation/>
-            {children}
-          </TransactionPopupProvider>
-        </NotificationProvider>
+        <BlockscoutProvider>
+          <Navigation/>
+          {children}
+        </BlockscoutProvider>
       </body>
     </html>
   );
