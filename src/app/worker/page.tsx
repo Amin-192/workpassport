@@ -163,24 +163,29 @@ export default function WorkerPage() {
       checkEscrow()
     }, [])
 
-    const checkEscrow = async () => {
-      if (typeof window.ethereum === 'undefined') return
-      
-      try {
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, provider)
-        const [, amount, claimed] = await escrow.getEscrow(cred.worker_address, cred.credential_hash)
+   const checkEscrow = async () => {
+        if (typeof window.ethereum === 'undefined') return
         
-        if (amount > BigInt(0)) {
-          setEscrowInfo({
-            amount: ethers.formatUnits(amount, 6),
-            claimed
-          })
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum)
+          const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, provider)
+          
+          const result = await escrow.getEscrow(cred.worker_address, cred.credential_hash)
+          
+          if (result && result.length >= 3) {
+            const [, amount, claimed] = result
+            
+            if (amount > BigInt(0)) {
+              setEscrowInfo({
+                amount: ethers.formatUnits(amount, 6),
+                claimed
+              })
+            }
+          }
+        } catch (error) {
+
         }
-      } catch (error) {
-        console.error('Failed to check escrow:', error)
       }
-    }
 
     const handleClaim = async () => {
       setClaiming(true)
