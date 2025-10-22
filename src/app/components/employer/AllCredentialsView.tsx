@@ -149,23 +149,6 @@ export default function AllCredentialsView({ issuerAddress }: AllCredentialsView
                   <div className="text-sm text-text-secondary mb-1">
                     {new Date(cred.created_at).toLocaleDateString()}
                   </div>
-                  {cred.paymentAmount && (
-                    <div className={`flex items-center gap-1 text-xs ${
-                      cred.paymentClaimed ? 'text-green-500' : 'text-yellow-500'
-                    }`}>
-                      {cred.paymentClaimed ? (
-                        <>
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Claimed</span>
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="w-3 h-3" />
-                          <span>Pending</span>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -199,7 +182,11 @@ export default function AllCredentialsView({ issuerAddress }: AllCredentialsView
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-text-secondary" />
+                      <img 
+                        src="https://ethglobal.b-cdn.net/organizations/aezzh/square-logo/default.png" 
+                        alt="PYUSD"
+                        className="w-4 h-4"
+                      />
                       <span className="text-sm font-medium">
                         {cred.paymentAmount} PYUSD
                       </span>

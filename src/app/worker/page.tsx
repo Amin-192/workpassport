@@ -477,7 +477,7 @@ export default function WorkerPage() {
                       href={`https://eth-sepolia.blockscout.com/address/${cred.issuer_address}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      className="text-xs text-gray-400 hover:text-blue-300 flex items-center gap-1"
                     >
                       View Issuer <ExternalLink className="w-3 h-3" />
                     </a>
