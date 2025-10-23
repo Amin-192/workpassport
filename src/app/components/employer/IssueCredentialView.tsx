@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { CONTRACT_ADDRESS, CONTRACT_ABI, ESCROW_ADDRESS, ESCROW_ABI, PYUSD_ADDRESS, PYUSD_ABI } from '@/lib/contract'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
 import { CheckCircle2, Loader2 } from 'lucide-react'
+import { encryptCredentialField } from '@/lib/litEncryption'
 
 interface IssueCredentialViewProps {
   issuerAddress: string
@@ -19,7 +20,8 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
     startDate: '',
     endDate: '',
     skills: '',
-    paymentAmount: ''
+    paymentAmount: '',
+    salary: ''
   })
   const [loading, setLoading] = useState(false)
   const [txHash, setTxHash] = useState('')
@@ -51,6 +53,15 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
         end_date: formData.endDate || null,
         skills: formData.skills.split(',').map(s => s.trim()),
         created_at: createdAt
+      }
+
+      let salaryEncrypted = null
+      if (formData.salary && formData.salary.trim() !== '') {
+        setStatus('Encrypting salary with Lit Protocol...')
+        salaryEncrypted = await encryptCredentialField(
+          formData.salary,
+          formData.workerAddress
+        )
       }
 
       setStatus('Signing credential...')
@@ -92,7 +103,8 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
           ...credential,
           credential_hash: credentialHash,
           signature: signature,
-          signed_message: signedMessage
+          signed_message: signedMessage,
+          salary_encrypted: salaryEncrypted
         }])
 
       if (error) throw error
@@ -106,7 +118,8 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
         startDate: '',
         endDate: '',
         skills: '',
-        paymentAmount: ''
+        paymentAmount: '',
+        salary: ''
       })
       
       if (onCredentialIssued) onCredentialIssued()
@@ -222,6 +235,18 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
               required
               className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Salary (Optional)</label>
+            <input 
+              type="text"
+              value={formData.salary}
+              onChange={(e) => setFormData({...formData, salary: e.target.value})}
+              placeholder="$150,000"
+              className="w-full px-4 py-3 bg-bg-secondary border border-border rounded-lg focus:outline-none focus:border-white transition-colors"
+            />
+            <p className="text-xs text-text-secondary mt-1">Will be encrypted with Lit Protocol - only worker can decrypt</p>
           </div>
 
           <div>
