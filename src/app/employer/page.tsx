@@ -10,6 +10,7 @@ import EmployerSidebar from '../components/employer/EmployerSidebar'
 import DashboardView from '../components/employer/DashboardView'
 import IssueCredentialView from '../components/employer/IssueCredentialView'
 import AllCredentialsView from '../components/employer/AllCredentialsView'
+import CompanyVerification from '../components/employer/CompanyVerification'
 
 export default function EmployerPage() {
   const router = useRouter()
@@ -17,11 +18,19 @@ export default function EmployerPage() {
   const [showRoleSelector, setShowRoleSelector] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [activeView, setActiveView] = useState<'dashboard' | 'issue' | 'all'>('dashboard')
+  const [isVerified, setIsVerified] = useState(false)
+  const [verificationLoading, setVerificationLoading] = useState(true)
   const { openPopup } = useTransactionPopup()
 
   useEffect(() => {
     checkExistingConnection()
   }, [router])
+
+  useEffect(() => {
+    if (address) {
+      checkVerification()
+    }
+  }, [address])
 
   const checkExistingConnection = async () => {
     const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
@@ -68,6 +77,28 @@ export default function EmployerPage() {
       }
     } else {
       setPageLoading(false)
+    }
+  }
+
+  const checkVerification = async () => {
+    setVerificationLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('company_verifications')
+        .select('status')
+        .eq('employer_address', address.toLowerCase())
+        .eq('status', 'verified')
+        .single()
+
+      if (!error && data) {
+        setIsVerified(true)
+      } else {
+        setIsVerified(false)
+      }
+    } catch (error) {
+      setIsVerified(false)
+    } finally {
+      setVerificationLoading(false)
     }
   }
 
@@ -123,7 +154,7 @@ export default function EmployerPage() {
               Please connect your wallet to issue credentials
             </p>
             <p className="text-sm text-text-secondary">
-              Click "Connect Wallet" in the top right corner
+              Click &quot;Connect Wallet&quot; in the top right corner
             </p>
           </div>
         </div>
@@ -135,7 +166,7 @@ export default function EmployerPage() {
     return <RoleSelector onSelectRole={handleRoleSelect} />
   }
 
-  if (pageLoading) {
+  if (pageLoading || verificationLoading) {
     return (
       <div className="min-h-screen bg-bg-primary text-text-primary flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-text-secondary" />
@@ -145,7 +176,11 @@ export default function EmployerPage() {
 
   return (
     <div className="flex min-h-screen bg-bg-primary text-text-primary">
-      <EmployerSidebar activeView={activeView} onChangeView={setActiveView} />
+      <EmployerSidebar 
+        activeView={activeView} 
+        onChangeView={setActiveView}
+        isVerified={isVerified}
+      />
       
       <div className="flex-1 p-12">
         <div className="flex justify-end mb-6">
@@ -163,19 +198,38 @@ export default function EmployerPage() {
         </div>
 
         {activeView === 'dashboard' && (
-          <DashboardView 
-            issuerAddress={address}
-            onNavigate={setActiveView}
-          />
+          <>
+            {!isVerified && (
+              <div className="mb-8">
+                <CompanyVerification employerAddress={address} />
+              </div>
+            )}
+            <DashboardView 
+              issuerAddress={address}
+              onNavigate={setActiveView}
+            />
+          </>
         )}
 
         {activeView === 'issue' && (
-          <IssueCredentialView 
-            issuerAddress={address}
-            onCredentialIssued={() => {
-              setActiveView('dashboard')
-            }}
-          />
+          <>
+            {!isVerified ? (
+              <div className="max-w-4xl">
+                <div className="mb-8">
+                  <h1 className="text-3xl font-bold mb-2">Issue Credential</h1>
+                  <p className="text-text-secondary">Verify your company first to issue credentials</p>
+                </div>
+                <CompanyVerification employerAddress={address} />
+              </div>
+            ) : (
+              <IssueCredentialView 
+                issuerAddress={address}
+                onCredentialIssued={() => {
+                  setActiveView('dashboard')
+                }}
+              />
+            )}
+          </>
         )}
         
         {activeView === 'all' && (
