@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText, CheckCircle2, Github, Star, Loader2, ExternalLink } from 'lucide-react'
+import { FileText, CheckCircle2, Github, Star, Loader2, ExternalLink, QrCode, X } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -11,6 +11,7 @@ import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
 import RoleSelector from '../components/RoleSelector'
 import { useNotification, useTransactionPopup } from '@blockscout/app-sdk'
+import { QRCodeSVG } from 'qrcode.react'
 
 export default function WorkerPage() {
   const router = useRouter()
@@ -19,6 +20,7 @@ export default function WorkerPage() {
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [showRoleSelector, setShowRoleSelector] = useState(false)
+  const [showProfileQR, setShowProfileQR] = useState(false)
   const [githubData, setGithubData] = useState<{ 
     user: { login: string }, 
     repos: any[], 
@@ -212,43 +214,35 @@ export default function WorkerPage() {
         checkEscrow()
       } catch (error) {
         console.error('Claim failed:', error)
-        alert('Failed to claim payment')
+        alert('Failed to claim payment. Please try again.')
       } finally {
         setClaiming(false)
       }
     }
 
-    if (!escrowInfo || escrowInfo.amount === '0') return null
+    if (!escrowInfo) return null
 
     return (
       <div className="mt-4 pt-4 border-t border-border">
-        {escrowInfo.claimed || cred.claim_tx_hash ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-green-500">
-              <CheckCircle2 className="w-5 h-5" />
-              <span className="font-medium">Claimed {escrowInfo.amount} PYUSD</span>
-            </div>
-            {cred.claim_tx_hash && (
-              <a
-                href={`https://eth-sepolia.blockscout.com/tx/${cred.claim_tx_hash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-              >
-                View Transaction <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img 
+              src="https://ethglobal.b-cdn.net/organizations/aezzh/square-logo/default.png" 
+              alt="PYUSD"
+              className="w-5 h-5"
+            />
+            <span className="font-semibold">{escrowInfo.amount} PYUSD</span>
           </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <span className="text-text-secondary">Available: </span>
-              <span className="font-semibold text-green-500">{escrowInfo.amount} PYUSD</span>
-            </div>
+          {escrowInfo.claimed ? (
+            <span className="text-sm text-green-500 flex items-center gap-1">
+              <CheckCircle2 className="w-4 h-4" />
+              Claimed
+            </span>
+          ) : (
             <button
               onClick={handleClaim}
               disabled={claiming}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-white hover:bg-gray-700 text-black disabled:bg-gray-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
               {claiming ? (
                 <>
@@ -256,28 +250,22 @@ export default function WorkerPage() {
                   Claiming...
                 </>
               ) : (
-                'Claim PYUSD'
+                'Claim Payment'
               )}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }
 
   const SkeletonCard = () => (
     <div className="border border-border rounded-xl p-6 animate-pulse">
-      <div className="flex justify-between items-start mb-4">
-        <div className="space-y-2 flex-1">
-          <div className="h-6 bg-bg-secondary rounded w-1/3"></div>
-          <div className="h-4 bg-bg-secondary rounded w-1/4"></div>
-        </div>
-        <div className="h-4 bg-bg-secondary rounded w-32"></div>
-      </div>
-      <div className="flex gap-2">
-        <div className="h-8 bg-bg-secondary rounded-full w-20"></div>
-        <div className="h-8 bg-bg-secondary rounded-full w-24"></div>
-        <div className="h-8 bg-bg-secondary rounded-full w-16"></div>
+      <div className="h-6 bg-bg-secondary rounded w-1/3 mb-4"></div>
+      <div className="h-4 bg-bg-secondary rounded w-1/4 mb-4"></div>
+      <div className="flex gap-2 mb-4">
+        <div className="h-8 bg-bg-secondary rounded w-20"></div>
+        <div className="h-8 bg-bg-secondary rounded w-20"></div>
       </div>
     </div>
   )
@@ -312,7 +300,16 @@ export default function WorkerPage() {
             <h1 className="text-3xl font-bold mb-2">Your Work Passport</h1>
             <p className="text-text-secondary">Manage your verifiable credentials and work history</p>
           </div>
-          {address && (
+          <div className="flex gap-2">
+            {address && (
+              <>
+                <button
+                  onClick={() => setShowProfileQR(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-border hover:border-text-secondary rounded-lg transition-colors text-sm"
+                >
+                  <QrCode className="w-4 h-4" />
+                  Share Profile
+                </button>
                 <button
                   onClick={() => openPopup({ chainId: '11155111', address })}
                   className="flex items-center gap-2 px-4 py-2 border border-border hover:border-text-secondary rounded-lg transition-colors text-sm"
@@ -324,7 +321,9 @@ export default function WorkerPage() {
                   />
                   Transaction History
                 </button>
-              )}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="mb-8">
@@ -500,6 +499,30 @@ export default function WorkerPage() {
           </div>
         )}
       </div>
+
+      {/* Profile QR Modal */}
+      {showProfileQR && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary border border-border rounded-xl p-8 max-w-md">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">Share Your Profile</h3>
+              <button onClick={() => setShowProfileQR(false)}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="bg-white p-6 rounded-lg">
+              <QRCodeSVG 
+                value={`${window.location.origin}/verify?address=${address}`}
+                size={256}
+                level="H"
+              />
+            </div>
+            <p className="text-sm text-text-secondary text-center mt-4">
+              Scan to view complete work history
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
