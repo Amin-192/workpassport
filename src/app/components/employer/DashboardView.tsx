@@ -3,8 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ethers } from 'ethers'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
-import { FileText, DollarSign, Users, ArrowRight, Loader2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { FileText, DollarSign, Users, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react'
 
 interface DashboardViewProps {
   issuerAddress: string
@@ -19,10 +18,31 @@ export default function DashboardView({ issuerAddress, onNavigate }: DashboardVi
   })
   const [recentCredentials, setRecentCredentials] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [companyName, setCompanyName] = useState<string | null>(null)
+  const [isVerified, setIsVerified] = useState(false)
 
   useEffect(() => {
     loadData()
+    loadCompanyInfo()
   }, [issuerAddress])
+
+  const loadCompanyInfo = async () => {
+    try {
+      const { data } = await supabase
+        .from('company_verifications')
+        .select('company_name, status')
+        .eq('employer_address', issuerAddress.toLowerCase())
+        .eq('status', 'verified')
+        .single()
+
+      if (data) {
+        setCompanyName(data.company_name)
+        setIsVerified(true)
+      }
+    } catch (error) {
+      // No verified company
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -51,6 +71,7 @@ export default function DashboardView({ issuerAddress, onNavigate }: DashboardVi
                 totalEscrowed += parseFloat(ethers.formatUnits(amount, 6))
               }
             } catch (e) {
+              // Skip if escrow doesn't exist
             }
           }
         }
@@ -79,10 +100,20 @@ export default function DashboardView({ issuerAddress, onNavigate }: DashboardVi
   return (
     <div className="max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-        <p className="text-text-secondary">Overview of your issued credentials</p>
+  {isVerified && companyName && (
+    <div className="mb-4 flex items-center gap-3 p-4  border border-green-800 rounded-xl">
+      <CheckCircle2 className="w-6 h-6 " />
+      <div>
+        <h2 className="text-xl font-bold ">{companyName}</h2>
+        <p className="text-sm text-green-500/80">Verified Company</p>
       </div>
+    </div>
+  )}
+  <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+  <p className="text-text-secondary">Overview of your issued credentials</p>
+</div>
 
+      {/* Rest of the component stays the same... */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <div className="p-6 border border-border rounded-xl bg-bg-secondary/30">
           <div className="flex items-center gap-3 mb-4">

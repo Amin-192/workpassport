@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
 import { CONTRACT_ADDRESS, CONTRACT_ABI, ESCROW_ADDRESS, ESCROW_ABI, PYUSD_ADDRESS, PYUSD_ABI } from '@/lib/contract'
@@ -26,6 +26,29 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
   const [loading, setLoading] = useState(false)
   const [txHash, setTxHash] = useState('')
   const [status, setStatus] = useState('')
+  const [verifiedCompanyName, setVerifiedCompanyName] = useState<string>('')
+
+  useEffect(() => {
+    loadVerifiedCompany()
+  }, [issuerAddress])
+
+  const loadVerifiedCompany = async () => {
+    try {
+      const { data } = await supabase
+        .from('company_verifications')
+        .select('company_name')
+        .eq('employer_address', issuerAddress.toLowerCase())
+        .eq('status', 'verified')
+        .single()
+
+      if (data) {
+        setVerifiedCompanyName(data.company_name)
+        setFormData(prev => ({ ...prev, company: data.company_name }))
+      }
+    } catch (error) {
+      // No verified company
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -114,7 +137,7 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
       setFormData({
         workerAddress: '',
         position: '',
-        company: '',
+        company: verifiedCompanyName,
         startDate: '',
         endDate: '',
         skills: '',

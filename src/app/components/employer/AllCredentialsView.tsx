@@ -143,7 +143,13 @@ export default function AllCredentialsView({ issuerAddress }: AllCredentialsView
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-lg font-semibold mb-1">{cred.position}</h3>
-                  <p className="text-text-secondary text-sm">{cred.company}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-text-secondary text-sm">{cred.company}</p>
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/50 rounded-full">
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      <span className="text-xs text-green-500">Verified</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-text-secondary mb-1">
