@@ -3,18 +3,15 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText, CheckCircle2, Github, Star, Loader2, ExternalLink } from 'lucide-react'
-import { generateGitHubCredential } from '@/lib/generateCredential'
+import { FileText, CheckCircle2, Github, Star, Loader2 } from 'lucide-react'
 import { ethers } from 'ethers'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getCachedGitHubData, setCachedGitHubData } from '@/lib/githubCache'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
 import RoleSelector from '../components/RoleSelector'
-import { useNotification, useTransactionPopup } from '@blockscout/app-sdk'
 
 export default function WorkerPage() {
   const router = useRouter()
-  const { openPopup } = useTransactionPopup()
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -55,6 +52,7 @@ export default function WorkerPage() {
           
           if (dbRole) {
             const role = dbRole.role
+            
             localStorage.setItem(`role_${walletAddress}`, role)
             
             if (role === 'employer') {
@@ -100,6 +98,7 @@ export default function WorkerPage() {
       }
       
       localStorage.setItem(`role_${address}`, role)
+      
       window.dispatchEvent(new Event('storage'))
       
       if (role === 'employer') {
@@ -118,13 +117,30 @@ export default function WorkerPage() {
 
   const fetchCredentials = async (workerAddress: string) => {
     setLoading(true)
+    
     const { data, error } = await supabase
       .from('credentials')
       .select('*')
       .ilike('worker_address', workerAddress)
     
     if (!error && data) {
-      setCredentials(data)
+      const credentialsWithVerification = await Promise.all(
+        data.map(async (cred) => {
+          const { data: verification } = await supabase
+            .from('company_verifications')
+            .select('status')
+            .eq('employer_address', cred.issuer_address.toLowerCase())
+            .eq('status', 'verified')
+            .single()
+          
+          return {
+            ...cred,
+            is_verified: !!verification
+          }
+        })
+      )
+      
+      setCredentials(credentialsWithVerification)
     }
     setLoading(false)
   }
@@ -144,6 +160,7 @@ export default function WorkerPage() {
       
       if (response.ok) {
         const freshData = await response.json()
+        
         setGithubData(freshData)
         setCachedGitHubData(walletAddress, freshData)
       }
@@ -155,7 +172,6 @@ export default function WorkerPage() {
   }
 
   const ClaimButton = ({ cred }: { cred: Credential }) => {
-    const { openTxToast } = useNotification()
     const [claiming, setClaiming] = useState(false)
     const [escrowInfo, setEscrowInfo] = useState<{amount: string, claimed: boolean} | null>(null)
 
@@ -169,19 +185,16 @@ export default function WorkerPage() {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum)
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, provider)
-        const result = await escrow.getEscrow(cred.worker_address, cred.credential_hash)
+        const [, amount, claimed] = await escrow.getEscrow(cred.worker_address, cred.credential_hash)
         
-        if (result && result.length >= 3) {
-          const [, amount, claimed] = result
-          
-          if (amount > BigInt(0)) {
-            setEscrowInfo({
-              amount: ethers.formatUnits(amount, 6),
-              claimed
-            })
-          }
+        if (amount > BigInt(0)) {
+          setEscrowInfo({
+            amount: ethers.formatUnits(amount, 6),
+            claimed
+          })
         }
       } catch (error) {
+        console.error('Failed to check escrow:', error)
       }
     }
 
@@ -197,18 +210,9 @@ export default function WorkerPage() {
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
         
         const tx = await escrow.claimPayment(cred.credential_hash)
-        openTxToast('11155111', tx.hash)
-        
         await tx.wait()
         
-        await supabase
-          .from('credentials')
-          .update({ 
-            claim_tx_hash: tx.hash,
-            claim_timestamp: new Date().toISOString()
-          })
-          .eq('id', cred.id)
-        
+        alert('Payment claimed successfully!')
         checkEscrow()
       } catch (error) {
         console.error('Claim failed:', error)
@@ -222,44 +226,26 @@ export default function WorkerPage() {
 
     return (
       <div className="mt-4 pt-4 border-t border-border">
-        {escrowInfo.claimed || cred.claim_tx_hash ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-green-500">
-              <CheckCircle2 className="w-5 h-5" />
-              <span className="font-medium">Claimed {escrowInfo.amount} PYUSD</span>
-            </div>
-            {cred.claim_tx_hash && (
-              <a
-                href={`https://eth-sepolia.blockscout.com/tx/${cred.claim_tx_hash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-              >
-                View Transaction <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
+        {escrowInfo.claimed ? (
+          <div className="flex items-center gap-2 text-green-500 text-sm">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Payment claimed: {escrowInfo.amount} PYUSD</span>
           </div>
         ) : (
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <span className="text-text-secondary">Available: </span>
-              <span className="font-semibold text-green-500">{escrowInfo.amount} PYUSD</span>
-            </div>
-            <button
-              onClick={handleClaim}
-              disabled={claiming}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {claiming ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Claiming...
-                </>
-              ) : (
-                'Claim PYUSD'
-              )}
-            </button>
-          </div>
+          <button
+            onClick={handleClaim}
+            disabled={claiming}
+            className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {claiming ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Claiming...
+              </>
+            ) : (
+              `Claim ${escrowInfo.amount} PYUSD`
+            )}
+          </button>
         )}
       </div>
     )
@@ -307,24 +293,9 @@ export default function WorkerPage() {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Your Work Passport</h1>
-            <p className="text-text-secondary">Manage your verifiable credentials and work history</p>
-          </div>
-          {address && (
-                <button
-                  onClick={() => openPopup({ chainId: '11155111', address })}
-                  className="flex items-center gap-2 px-4 py-2 border border-border hover:border-text-secondary rounded-lg transition-colors text-sm"
-                >
-                  <img 
-                    src="https://ethglobal.b-cdn.net/organizations/8kguf/square-logo/default.png" 
-                    alt="Blockscout"
-                    className="w-4 h-4"
-                  />
-                  Transaction History
-                </button>
-              )}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Your Work Passport</h1>
+          <p className="text-text-secondary">Manage your verifiable credentials and work history</p>
         </div>
 
         <div className="mb-8">
@@ -449,7 +420,7 @@ export default function WorkerPage() {
           </div>
         ) : credentials.length > 0 ? (
           <div className="space-y-4">
-            {credentials.map((cred) => {
+            {credentials.map((cred: any) => {
               const isGitHubCredential = cred.company.includes('GitHub (@')
               if (isGitHubCredential) return null
               
@@ -461,13 +432,21 @@ export default function WorkerPage() {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-lg font-semibold">{cred.position}</h3>
-                      <p className="text-text-secondary text-sm">{cred.company}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-text-secondary text-sm">{cred.company}</p>
+                        {cred.is_verified && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/50 rounded-full">
+                            <CheckCircle2 className="w-3 h-3 text-green-500" />
+                            <span className="text-xs text-green-500">Verified</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="text-sm text-text-secondary">
                       {cred.start_date} - {cred.end_date || 'Present'}
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-wrap mb-3">
+                  <div className="flex gap-2 flex-wrap">
                     {cred.skills.map((skill: string, i: number) => (
                       <span 
                         key={i}
@@ -476,16 +455,6 @@ export default function WorkerPage() {
                         {skill}
                       </span>
                     ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <a
-                      href={`https://eth-sepolia.blockscout.com/address/${cred.issuer_address}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-gray-400 hover:text-blue-300 flex items-center gap-1"
-                    >
-                      View Issuer <ExternalLink className="w-3 h-3" />
-                    </a>
                   </div>
                   <ClaimButton cred={cred} />
                 </div>
