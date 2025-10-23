@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "./components/naviagtion/Navigation";
+import BlockscoutProvider from "./components/BlockscoutProvider";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -13,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "workspace",
+  title: "WorkPassport",
   description: "Verifiable credentials for remote workers",
 };
 
@@ -27,8 +29,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Navigation/>
-        {children}
+        <BlockscoutProvider>
+          <Navigation/>
+          {children}
+        </BlockscoutProvider>
       </body>
     </html>
   );

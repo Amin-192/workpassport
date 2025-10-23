@@ -11,6 +11,8 @@ export interface Credential {
   credential_hash: string
   signature: string
   signed_message: string
+  claim_tx_hash?: string
+  claim_timestamp?: string
   salary_encrypted?: {
     ciphertext: string
     dataToEncryptHash: string

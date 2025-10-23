@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
+import { useTransactionPopup } from '@blockscout/app-sdk'
 import RoleSelector from '../components/RoleSelector'
 import EmployerSidebar from '../components/employer/EmployerSidebar'
 import DashboardView from '../components/employer/DashboardView'
@@ -16,6 +17,7 @@ export default function EmployerPage() {
   const [showRoleSelector, setShowRoleSelector] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
   const [activeView, setActiveView] = useState<'dashboard' | 'issue' | 'all'>('dashboard')
+  const { openPopup } = useTransactionPopup()
 
   useEffect(() => {
     checkExistingConnection()
@@ -104,6 +106,13 @@ export default function EmployerPage() {
     }
   }
 
+  const handleViewTransactionHistory = () => {
+    openPopup({
+      chainId: "11155111",
+      address: address,
+    })
+  }
+
   if (!address && !showRoleSelector && !pageLoading) {
     return (
       <div className="min-h-screen bg-bg-primary text-text-primary">
@@ -139,6 +148,20 @@ export default function EmployerPage() {
       <EmployerSidebar activeView={activeView} onChangeView={setActiveView} />
       
       <div className="flex-1 p-12">
+        <div className="flex justify-end mb-6">
+          <button
+            onClick={handleViewTransactionHistory}
+            className="flex items-center gap-2 px-4 py-2 bg-bg-secondary hover:bg-bg-tertiary border border-border rounded-lg transition-all"
+          >
+            <img 
+              src="https://ethglobal.b-cdn.net/organizations/8kguf/square-logo/default.png" 
+              alt="Blockscout"
+              className="w-4 h-4"
+            />
+            <span>Transaction History</span>
+          </button>
+        </div>
+
         {activeView === 'dashboard' && (
           <DashboardView 
             issuerAddress={address}
@@ -155,9 +178,9 @@ export default function EmployerPage() {
           />
         )}
         
-{activeView === 'all' && (
-  <AllCredentialsView issuerAddress={address} />
-)}
+        {activeView === 'all' && (
+          <AllCredentialsView issuerAddress={address} />
+        )}
       </div>
     </div>
   )
