@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Credential } from '@/types/credentials'
-import { FileText, CheckCircle2, Github, Star, Loader2 } from 'lucide-react'
 import { FileText, CheckCircle2, Github, Star, Loader2, ExternalLink, QrCode, X } from 'lucide-react'
 import { generateGitHubCredential } from '@/lib/generateCredential'
 import { ethers } from 'ethers'
@@ -16,6 +15,7 @@ import { QRCodeSVG } from 'qrcode.react'
 
 export default function WorkerPage() {
   const router = useRouter()
+  const transactionPopup = useTransactionPopup()
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -231,27 +231,7 @@ export default function WorkerPage() {
 
     return (
       <div className="mt-4 pt-4 border-t border-border">
-        {escrowInfo.claimed ? (
-          <div className="flex items-center gap-2 text-green-500 text-sm">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Payment claimed: {escrowInfo.amount} PYUSD</span>
-          </div>
-        ) : (
-          <button
-            onClick={handleClaim}
-            disabled={claiming}
-            className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-white/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {claiming ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Claiming...
-              </>
-            ) : (
-              `Claim ${escrowInfo.amount} PYUSD`
-            )}
-          </button>
-        )}
+        
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img 
@@ -323,9 +303,6 @@ export default function WorkerPage() {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Your Work Passport</h1>
-          <p className="text-text-secondary">Manage your verifiable credentials and work history</p>
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Your Work Passport</h1>
@@ -342,7 +319,7 @@ export default function WorkerPage() {
                   Share Profile
                 </button>
                 <button
-                  onClick={() => openPopup({ chainId: '11155111', address })}
+                  onClick={() => transactionPopup.openPopup({ chainId: '11155111', address })}
                   className="flex items-center gap-2 px-4 py-2 border border-border hover:border-text-secondary rounded-lg transition-colors text-sm"
                 >
                   <img 
@@ -493,12 +470,7 @@ export default function WorkerPage() {
                       <h3 className="text-lg font-semibold">{cred.position}</h3>
                       <div className="flex items-center gap-2">
                         <p className="text-text-secondary text-sm">{cred.company}</p>
-                        {cred.is_verified && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/50 rounded-full">
-                            <CheckCircle2 className="w-3 h-3 text-green-500" />
-                            <span className="text-xs text-green-500">Verified</span>
-                          </div>
-                        )}
+                        
                       </div>
                     </div>
                     <div className="text-sm text-text-secondary">
