@@ -15,7 +15,8 @@ import { QRCodeSVG } from 'qrcode.react'
 
 export default function WorkerPage() {
   const router = useRouter()
-  const transactionPopup = useTransactionPopup()
+  const { openPopup } = useTransactionPopup()
+  const { openTxToast } = useNotification()
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [address, setAddress] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -74,7 +75,6 @@ export default function WorkerPage() {
           setLoading(false)
         }
       } catch (error) {
-        console.error('Failed to check connection:', error)
         setLoading(false)
       }
     } else {
@@ -115,7 +115,6 @@ export default function WorkerPage() {
         fetchGitHubData(address)
       }
     } catch (error) {
-      console.error('Failed to save role:', error)
       alert('Failed to save role. Please try again.')
     }
   }
@@ -170,7 +169,6 @@ export default function WorkerPage() {
         setCachedGitHubData(walletAddress, freshData)
       }
     } catch (error) {
-      console.error('Failed to fetch GitHub data:', error)
     } finally {
       setGithubLoading(false)
     }
@@ -199,28 +197,32 @@ export default function WorkerPage() {
           })
         }
       } catch (error) {
-        console.error('Failed to check escrow:', error)
       }
     }
 
     const handleClaim = async () => {
+      if (claiming) return
+      
       setClaiming(true)
       try {
         if (typeof window.ethereum === 'undefined') {
           alert('Please install MetaMask!')
           return
         }
+        
         const provider = new ethers.BrowserProvider(window.ethereum)
         const signer = await provider.getSigner()
         const escrow = new ethers.Contract(ESCROW_ADDRESS, ESCROW_ABI, signer)
         
         const tx = await escrow.claimPayment(cred.credential_hash)
+        
+        openTxToast("11155111", tx.hash)
+        
         await tx.wait()
         
         alert('Payment claimed successfully!')
         checkEscrow()
       } catch (error) {
-        console.error('Claim failed:', error)
         alert('Failed to claim payment. Please try again.')
       } finally {
         setClaiming(false)
@@ -231,7 +233,6 @@ export default function WorkerPage() {
 
     return (
       <div className="mt-4 pt-4 border-t border-border">
-        
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img 
@@ -319,7 +320,7 @@ export default function WorkerPage() {
                   Share Profile
                 </button>
                 <button
-                  onClick={() => transactionPopup.openPopup({ chainId: '11155111', address })}
+                  onClick={() => openPopup({ chainId: '11155111', address })}
                   className="flex items-center gap-2 px-4 py-2 border border-border hover:border-text-secondary rounded-lg transition-colors text-sm"
                 >
                   <img 
@@ -470,7 +471,6 @@ export default function WorkerPage() {
                       <h3 className="text-lg font-semibold">{cred.position}</h3>
                       <div className="flex items-center gap-2">
                         <p className="text-text-secondary text-sm">{cred.company}</p>
-                        
                       </div>
                     </div>
                     <div className="text-sm text-text-secondary">
@@ -501,7 +501,6 @@ export default function WorkerPage() {
         )}
       </div>
 
-      {/* Profile QR Modal */}
       {showProfileQR && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-bg-primary border border-border rounded-xl p-8 max-w-md">
