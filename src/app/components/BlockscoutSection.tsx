@@ -88,6 +88,25 @@ export default function BlockscoutSection() {
               </div>
             </div>
           </div>
+
+          <div className="mt-20">
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold mb-2">See Blockscout in Action</h3>
+              <p className="text-text-secondary">Watch how transaction transparency works in WorkPassport</p>
+            </div>
+            <div className="flex justify-center">
+              <div className="w-full max-w-5xl">
+                <div className="rounded-2xl overflow-hidden border border-border bg-bg-primary" style={{ paddingBottom: '56.25%', position: 'relative', height: 0 }}>
+                  <iframe 
+                    src="https://www.loom.com/embed/0b6780bbc65e4aa1b9e5ff760ab7ab34" 
+                    frameBorder="0" 
+                    allowFullScreen
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>

@@ -72,7 +72,6 @@ export default function EmployerPage() {
           setPageLoading(false)
         }
       } catch (error) {
-        console.error('Failed to check connection:', error)
         setPageLoading(false)
       }
     } else {
@@ -132,7 +131,6 @@ export default function EmployerPage() {
         setPageLoading(false)
       }
     } catch (error) {
-      console.error('Failed to save role:', error)
       alert('Failed to save role. Please try again.')
     }
   }
