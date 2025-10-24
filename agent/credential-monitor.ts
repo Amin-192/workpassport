@@ -75,7 +75,52 @@ class CredentialMonitorAgent {
     }
   }
 
- 
+  async analyzeCredential(cred: any): Promise<CredentialAnalysis> {
+    const duration = this.calculateDuration(cred.start_date, cred.end_date)
+    
+    const prompt = `Analyze this work credential for fraud:
+
+Company: ${cred.company}
+Position: ${cred.position}
+Skills: ${cred.skills.join(', ')}
+Duration: ${duration} months
+
+Check for red flags:
+1. Unrealistic skill combinations
+2. Too many high-level skills for duration
+3. Generic company names
+4. Suspicious timing
+5. Position mismatch with skills
+
+Respond with JSON:
+{
+  "suspicious": boolean,
+  "confidence": number (0-100),
+  "reason": "explanation",
+  "riskLevel": "low" | "medium" | "high"
+}`
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a fraud detection specialist.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        response_format: { type: 'json_object' }
+      })
+
+      return JSON.parse(completion.choices[0].message.content || '{}')
+    } catch (error) {
+      return {
+        suspicious: false,
+        confidence: 0,
+        reason: 'Analysis failed',
+        riskLevel: 'low'
+      }
+    }
+  }
 
   async getEmployerStats(issuerAddress: string) {
     const { data: employerCreds, count } = await supabase
