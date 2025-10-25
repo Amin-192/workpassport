@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ethers } from 'ethers'
 import { ESCROW_ADDRESS, ESCROW_ABI } from '@/lib/contract'
-import { Search, Loader2, DollarSign, CheckCircle2, Clock } from 'lucide-react'
+import { Search, Loader2, DollarSign, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
 
 interface AllCredentialsViewProps {
   issuerAddress: string
@@ -21,6 +21,9 @@ interface CredentialWithPayment {
   credential_hash: string
   paymentAmount?: string
   paymentClaimed?: boolean
+  flagged?: boolean
+  flag_reason?: string
+  risk_level?: string
 }
 
 export default function AllCredentialsView({ issuerAddress }: AllCredentialsViewProps) {
@@ -63,7 +66,6 @@ export default function AllCredentialsView({ issuerAddress }: AllCredentialsView
                   paymentClaimed = claimed
                 }
               } catch (e) {
-                // No payment for this credential
               }
             }
 
@@ -138,7 +140,9 @@ export default function AllCredentialsView({ issuerAddress }: AllCredentialsView
           {filteredCredentials.map((cred) => (
             <div
               key={cred.id}
-              className="border border-border rounded-xl p-6 hover:border-text-secondary transition-colors"
+              className={`border rounded-xl p-6 hover:border-text-secondary transition-colors ${
+                cred.flagged ? 'border-red-500/50 bg-red-500/5' : 'border-border'
+              }`}
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -157,6 +161,18 @@ export default function AllCredentialsView({ issuerAddress }: AllCredentialsView
                   </div>
                 </div>
               </div>
+
+              {cred.flagged && (
+                <div className="mb-4 flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/50 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-500 mb-1">
+                      Flagged by AI - {cred.risk_level?.toUpperCase()} Risk
+                    </p>
+                    <p className="text-sm text-red-400">{cred.flag_reason}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4">
                 <p className="text-sm text-text-secondary mb-1">Worker Address:</p>
