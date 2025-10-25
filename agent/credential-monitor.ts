@@ -30,21 +30,21 @@ class CredentialMonitorAgent {
 
   async start() {
     if (this.running) {
-      console.log('⚠️  Agent already running')
+      console.log('  Agent already running')
       return
     }
 
     this.running = true
-    console.log('✅ Agent started')
-    console.log(`📡 Monitoring every ${this.checkInterval/1000}s`)
-    console.log(`📍 Checking credentials after: ${this.lastCheckedTime}`)
-    console.log('🔍 First check...\n')
+    console.log(' Agent started')
+    console.log(` Monitoring every ${this.checkInterval/1000}s`)
+    console.log(` Checking credentials after: ${this.lastCheckedTime}`)
+    console.log(' First check...\n')
 
     while (this.running) {
       try {
         await this.monitorCredentials()
       } catch (error) {
-        console.error('❌ Error:', error)
+        console.error(' Error:', error)
       }
       await this.sleep(this.checkInterval)
     }
@@ -60,7 +60,7 @@ class CredentialMonitorAgent {
       .order('created_at', { ascending: true })
     
     if (error) {
-      console.error('  ❌ Database error:', error)
+      console.error('   Database error:', error)
       return
     }
 
@@ -69,7 +69,7 @@ class CredentialMonitorAgent {
       return
     }
 
-    console.log(`  📋 Found ${newCreds.length} new credential(s)`)
+    console.log(`   Found ${newCreds.length} new credential(s)`)
 
     for (const cred of newCreds) {
       console.log(`\n  🔬 Analyzing credential ${cred.id}`)
@@ -78,17 +78,17 @@ class CredentialMonitorAgent {
       console.log(`     Worker: ${cred.worker_address}`)
 
       const analysis = await this.analyzeCredential(cred)
-      console.log(`     AI Analysis: ${analysis.suspicious ? '⚠️ SUSPICIOUS' : '✅ OK'} (${analysis.confidence}% confidence)`)
+      console.log(`     AI Analysis: ${analysis.suspicious ? ' SUSPICIOUS' : ' OK'} (${analysis.confidence}% confidence)`)
       console.log(`     Reason: ${analysis.reason}`)
       
       const employerStats = await this.getEmployerStats(cred.issuer_address)
       console.log(`     Employer: ${employerStats.totalIssued} total issued, ${employerStats.recentIssued} in 24h`)
       
       const onChainValid = await this.verifyOnChain(cred)
-      console.log(`     On-chain: ${onChainValid ? '✅ Verified' : '❌ Not found'}`)
+      console.log(`     On-chain: ${onChainValid ? ' Verified' : ' Not found'}`)
 
       if (analysis.suspicious || employerStats.suspicious || !onChainValid) {
-        console.log(`     🚨 FLAGGING CREDENTIAL`)
+        console.log(`     FLAGGING CREDENTIAL`)
         await this.flagCredential(cred, analysis, employerStats)
       }
 
@@ -139,7 +139,7 @@ Respond with JSON:
 
       return JSON.parse(completion.choices[0].message.content || '{}')
     } catch (error) {
-      console.error('     ⚠️  AI analysis failed:', error)
+      console.error('       AI analysis failed:', error)
       return {
         suspicious: false,
         confidence: 0,
@@ -183,7 +183,7 @@ Respond with JSON:
       
       return false
     } catch (error) {
-      console.error('     ⚠️  On-chain verification failed:', error)
+      console.error('       On-chain verification failed:', error)
       return true // Assume valid if verification fails
     }
   }
@@ -202,7 +202,7 @@ Respond with JSON:
       .eq('id', cred.id)
 
     if (error) {
-      console.error('     ⚠️  Failed to flag credential:', error)
+      console.error('       Failed to flag credential:', error)
     }
 
     await this.logAction('flag_credential', cred.id, flagReason)
@@ -222,7 +222,7 @@ Respond with JSON:
       }, { onConflict: 'employer_address' })
 
     if (error) {
-      console.error('     ⚠️  Failed to update reputation:', error)
+      console.error('      Failed to update reputation:', error)
     }
   }
 
@@ -237,7 +237,7 @@ Respond with JSON:
       })
 
     if (error) {
-      console.error('     ⚠️  Failed to log action:', error)
+      console.error('       Failed to log action:', error)
     }
   }
 
@@ -253,7 +253,7 @@ Respond with JSON:
 
   stop() {
     this.running = false
-    console.log('🛑 Agent stopped')
+    console.log(' Agent stopped')
   }
 }
 

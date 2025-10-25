@@ -35,7 +35,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
   useEffect(() => {
     checkVerificationStatus()
     
-    // Set up real-time subscription for status updates
     const subscription = supabase
       .channel(`company_verification_${employerAddress}`)
       .on(
@@ -47,32 +46,28 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
           filter: `employer_address=eq.${employerAddress.toLowerCase()}`
         },
         (payload) => {
-          console.log('🔔 Verification updated:', payload)
+          console.log('Verification updated:', payload)
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-            // Only update if not showing form
-            if (!showForm) {
-              setVerification(payload.new as Verification)
-            }
+            setVerification(payload.new as Verification)
+            setShowForm(false)
+            
+            // Dispatch custom event to notify parent component
+            window.dispatchEvent(new CustomEvent('companyVerificationUpdated'))
           }
         }
       )
       .subscribe()
 
-    // Poll every 5 seconds, but only if not showing form
-    const pollInterval = setInterval(() => {
-      if (!showForm) {
-        checkVerificationStatus()
-      }
-    }, 5000)
-
     return () => {
       subscription.unsubscribe()
-      clearInterval(pollInterval)
     }
-  }, [employerAddress, showForm])
+  }, [employerAddress])
 
-  const checkVerificationStatus = async () => {
-    setLoading(true)
+  const checkVerificationStatus = async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+    }
+    
     try {
       const { data, error } = await supabase
         .from('company_verifications')
@@ -91,7 +86,9 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
       console.error('Failed to check verification:', error)
       setVerification(null)
     } finally {
-      setLoading(false)
+      if (!silent) {
+        setLoading(false)
+      }
     }
   }
 
@@ -101,13 +98,11 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
     setNotification(null)
 
     try {
-      // Delete any existing verification for this employer
       await supabase
         .from('company_verifications')
         .delete()
         .eq('employer_address', employerAddress.toLowerCase())
 
-      // Insert new verification request
       const { data, error } = await supabase
         .from('company_verifications')
         .insert([{
@@ -131,7 +126,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
       setShowForm(false)
       setVerification(data)
       
-      // Clear form
       setFormData({
         companyName: '',
         website: '',
@@ -139,7 +133,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
         businessRegistration: ''
       })
 
-      // Clear notification after 5 seconds
       setTimeout(() => setNotification(null), 5000)
     } catch (error) {
       console.error('Submission failed:', error)
@@ -164,7 +157,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
     )
   }
 
-  // Notification banner
   const NotificationBanner = () => {
     if (!notification) return null
     
@@ -180,7 +172,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
     )
   }
 
-  // VERIFIED STATUS
   if (verification?.status === 'verified') {
     return (
       <div className="max-w-3xl">
@@ -189,7 +180,7 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
           <div className="flex items-center gap-3 mb-4">
             <CheckCircle2 className="w-6 h-6 text-green-500" />
             <div>
-              <h3 className="text-lg font-semibold">Company Verified ✓</h3>
+              <h3 className="text-lg font-semibold">Company Verified</h3>
               <p className="text-sm text-text-secondary">
                 {verification.company_name} • Verified {new Date(verification.verified_at!).toLocaleDateString()}
               </p>
@@ -203,20 +194,27 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
     )
   }
 
-  // PENDING STATUS
   if (verification?.status === 'pending') {
     return (
       <div className="max-w-3xl">
         <NotificationBanner />
         <div className="border border-yellow-500/50 rounded-xl p-6 bg-yellow-500/5">
-          <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-6 h-6 text-yellow-500 animate-pulse" />
-            <div>
-              <h3 className="text-lg font-semibold">AI Verification in Progress...</h3>
-              <p className="text-sm text-text-secondary">
-                {verification.company_name} • Submitted {new Date(verification.created_at).toLocaleDateString()}
-              </p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Clock className="w-6 h-6 text-yellow-500 animate-pulse" />
+              <div>
+                <h3 className="text-lg font-semibold">AI Verification in Progress...</h3>
+                <p className="text-sm text-text-secondary">
+                  {verification.company_name} • Submitted {new Date(verification.created_at).toLocaleDateString()}
+                </p>
+              </div>
             </div>
+            <button
+              onClick={() => checkVerificationStatus()}
+              className="px-4 py-2 text-sm border border-yellow-500/50 rounded-lg hover:bg-yellow-500/10 transition-colors"
+            >
+              Check Status
+            </button>
           </div>
           <div className="text-sm text-text-secondary mb-3">
             Our AI agent is verifying your company details. This usually takes 15-30 seconds.
@@ -230,7 +228,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
     )
   }
 
-  // REJECTED STATUS
   if (verification?.status === 'rejected' && !showForm) {
     return (
       <div className="max-w-3xl">
@@ -272,7 +269,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
     )
   }
 
-  // NO VERIFICATION - SHOW BUTTON
   if (!showForm && !verification) {
     return (
       <div className="max-w-3xl">
@@ -301,7 +297,6 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
     )
   }
 
-  // SHOW FORM
   return (
     <div className="max-w-3xl">
       <NotificationBanner />
@@ -371,7 +366,7 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
 
           <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-3">
             <p className="text-xs text-blue-400">
-              💡 Our AI will verify your company in 15-30 seconds by checking your website and company information
+              Our AI will verify your company in 15-30 seconds by checking your website and company information
             </p>
           </div>
 
