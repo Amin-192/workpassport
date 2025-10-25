@@ -26,37 +26,22 @@ export default function EmployerPage() {
     checkExistingConnection()
   }, [router])
 
-useEffect(() => {
-  if (address) {
-    checkVerification()
-    
-    const subscription = supabase
-      .channel('employer_verification_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'company_verifications',
-          filter: `employer_address=eq.${address.toLowerCase()}`
-        },
-        (payload) => {
-          console.log('🔔 Employer page: verification updated', payload.new)
-          checkVerification()
-        }
-      )
-      .subscribe()
-
-    const pollInterval = setInterval(() => {
+  useEffect(() => {
+    if (address) {
       checkVerification()
-    }, 10000)
-
-    return () => {
-      subscription.unsubscribe()
-      clearInterval(pollInterval)
+      
+      // Listen for custom event from CompanyVerification component
+      const handleVerificationUpdate = () => {
+        checkVerification()
+      }
+      
+      window.addEventListener('companyVerificationUpdated', handleVerificationUpdate)
+      
+      return () => {
+        window.removeEventListener('companyVerificationUpdated', handleVerificationUpdate)
+      }
     }
-  }
-}, [address])
+  }, [address])
 
   const checkExistingConnection = async () => {
     const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
@@ -113,7 +98,7 @@ useEffect(() => {
         .select('status')
         .eq('employer_address', address.toLowerCase())
         .eq('status', 'verified')
-        .single()
+        .maybeSingle()
 
       if (!error && data) {
         setIsVerified(true)
