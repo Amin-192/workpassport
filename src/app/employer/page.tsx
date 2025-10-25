@@ -29,6 +29,17 @@ export default function EmployerPage() {
   useEffect(() => {
     if (address) {
       checkVerification()
+      
+      // Listen for custom event from CompanyVerification component
+      const handleVerificationUpdate = () => {
+        checkVerification()
+      }
+      
+      window.addEventListener('companyVerificationUpdated', handleVerificationUpdate)
+      
+      return () => {
+        window.removeEventListener('companyVerificationUpdated', handleVerificationUpdate)
+      }
     }
   }, [address])
 
@@ -72,7 +83,6 @@ export default function EmployerPage() {
           setPageLoading(false)
         }
       } catch (error) {
-        console.error('Failed to check connection:', error)
         setPageLoading(false)
       }
     } else {
@@ -88,7 +98,7 @@ export default function EmployerPage() {
         .select('status')
         .eq('employer_address', address.toLowerCase())
         .eq('status', 'verified')
-        .single()
+        .maybeSingle()
 
       if (!error && data) {
         setIsVerified(true)
@@ -132,7 +142,6 @@ export default function EmployerPage() {
         setPageLoading(false)
       }
     } catch (error) {
-      console.error('Failed to save role:', error)
       alert('Failed to save role. Please try again.')
     }
   }

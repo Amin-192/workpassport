@@ -9,9 +9,9 @@ interface EmployerSidebarProps {
 
 export default function EmployerSidebar({ activeView, onChangeView, isVerified }: EmployerSidebarProps) {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'issue', label: 'Issue Credential', icon: PenSquare, requiresVerification: true },
-    { id: 'all', label: 'All Credentials', icon: FileText }
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, locked: false },
+    { id: 'issue', label: 'Issue Credential', icon: PenSquare, locked: !isVerified },
+    { id: 'all', label: 'All Credentials', icon: FileText, locked: false }
   ]
 
   return (
@@ -21,26 +21,25 @@ export default function EmployerSidebar({ activeView, onChangeView, isVerified }
         
         <nav className="space-y-2">
           {navItems.map((item) => {
-            const Icon = item.icon
+            const Icon = item.locked ? Lock : item.icon
             const isActive = activeView === item.id
-            const isLocked = item.requiresVerification && !isVerified
+            const isDisabled = item.locked
             
             return (
               <button
                 key={item.id}
-                onClick={() => onChangeView(item.id as any)}
-                disabled={isLocked}
+                onClick={() => !isDisabled && onChangeView(item.id as any)}
+                disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive
+                  isDisabled
+                    ? 'text-text-secondary opacity-50 cursor-not-allowed'
+                    : isActive
                     ? 'bg-white text-black'
-                    : isLocked
-                    ? 'text-text-secondary/50 cursor-not-allowed'
                     : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
                 }`}
               >
                 <Icon className="w-5 h-5" />
                 <span className="font-medium flex-1 text-left">{item.label}</span>
-                {isLocked && <Lock className="w-4 h-4" />}
               </button>
             )
           })}
