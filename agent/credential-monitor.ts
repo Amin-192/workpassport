@@ -16,63 +16,89 @@ interface CredentialAnalysis {
 
 class CredentialMonitorAgent {
   private running = false
-  private lastCheckedId = 0
+  private lastCheckedTime: string
   private provider: ethers.JsonRpcProvider
   private checkInterval = 30000
 
   constructor() {
+    // Start checking from 10 minutes ago
+    this.lastCheckedTime = new Date(Date.now() - 10 * 60 * 1000).toISOString()
     this.provider = new ethers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/YOUR_KEY'
     )
   }
 
   async start() {
-    this.running = true
-    
-    const { data: lastCred } = await supabase
-      .from('credentials')
-      .select('id')
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
-    
-    if (lastCred) {
-      this.lastCheckedId = lastCred.id - 10
+    if (this.running) {
+      console.log('⚠️  Agent already running')
+      return
     }
+
+    this.running = true
+    console.log('✅ Agent started')
+    console.log(`📡 Monitoring every ${this.checkInterval/1000}s`)
+    console.log(`📍 Checking credentials after: ${this.lastCheckedTime}`)
+    console.log('🔍 First check...\n')
 
     while (this.running) {
       try {
         await this.monitorCredentials()
       } catch (error) {
-        console.error('Agent error:', error)
+        console.error('❌ Error:', error)
       }
       await this.sleep(this.checkInterval)
     }
   }
 
   async monitorCredentials() {
-    const { data: newCreds } = await supabase
+    console.log(`[${new Date().toISOString()}] Checking...`)
+    
+    const { data: newCreds, error } = await supabase
       .from('credentials')
       .select('*')
-      .gt('id', this.lastCheckedId)
-      .order('id', { ascending: true })
+      .gt('created_at', this.lastCheckedTime)
+      .order('created_at', { ascending: true })
     
-    if (!newCreds || newCreds.length === 0) {
+    if (error) {
+      console.error('  ❌ Database error:', error)
       return
     }
 
+    if (!newCreds || newCreds.length === 0) {
+      console.log('  ✓ No new credentials\n')
+      return
+    }
+
+    console.log(`  📋 Found ${newCreds.length} new credential(s)`)
+
     for (const cred of newCreds) {
+      console.log(`\n  🔬 Analyzing credential ${cred.id}`)
+      console.log(`     Company: ${cred.company}`)
+      console.log(`     Position: ${cred.position}`)
+      console.log(`     Worker: ${cred.worker_address}`)
+
       const analysis = await this.analyzeCredential(cred)
+      console.log(`     AI Analysis: ${analysis.suspicious ? '⚠️ SUSPICIOUS' : '✅ OK'} (${analysis.confidence}% confidence)`)
+      console.log(`     Reason: ${analysis.reason}`)
+      
       const employerStats = await this.getEmployerStats(cred.issuer_address)
+      console.log(`     Employer: ${employerStats.totalIssued} total issued, ${employerStats.recentIssued} in 24h`)
+      
       const onChainValid = await this.verifyOnChain(cred)
+      console.log(`     On-chain: ${onChainValid ? '✅ Verified' : '❌ Not found'}`)
 
       if (analysis.suspicious || employerStats.suspicious || !onChainValid) {
+        console.log(`     🚨 FLAGGING CREDENTIAL`)
         await this.flagCredential(cred, analysis, employerStats)
       }
 
       await this.updateReputationScores(cred, analysis)
-      this.lastCheckedId = cred.id
+      
+      // Update checkpoint to this credential's timestamp
+      this.lastCheckedTime = cred.created_at
     }
+
+    console.log('')
   }
 
   async analyzeCredential(cred: any): Promise<CredentialAnalysis> {
@@ -113,6 +139,7 @@ Respond with JSON:
 
       return JSON.parse(completion.choices[0].message.content || '{}')
     } catch (error) {
+      console.error('     ⚠️  AI analysis failed:', error)
       return {
         suspicious: false,
         confidence: 0,
@@ -156,14 +183,15 @@ Respond with JSON:
       
       return false
     } catch (error) {
-      return true
+      console.error('     ⚠️  On-chain verification failed:', error)
+      return true // Assume valid if verification fails
     }
   }
 
   async flagCredential(cred: any, analysis: CredentialAnalysis, employerStats: any) {
     const flagReason = `AI: ${analysis.reason}. ${employerStats.suspicious ? employerStats.reason : ''}`
 
-    await supabase
+    const { error } = await supabase
       .from('credentials')
       .update({ 
         flagged: true, 
@@ -173,13 +201,17 @@ Respond with JSON:
       })
       .eq('id', cred.id)
 
+    if (error) {
+      console.error('     ⚠️  Failed to flag credential:', error)
+    }
+
     await this.logAction('flag_credential', cred.id, flagReason)
   }
 
   async updateReputationScores(cred: any, analysis: CredentialAnalysis) {
     const reputationDelta = analysis.suspicious ? -10 : +5
 
-    await supabase
+    const { error } = await supabase
       .from('employer_reputation')
       .upsert({
         employer_address: cred.issuer_address.toLowerCase(),
@@ -188,12 +220,25 @@ Respond with JSON:
         flagged_count: analysis.suspicious ? 1 : 0,
         updated_at: new Date().toISOString()
       }, { onConflict: 'employer_address' })
+
+    if (error) {
+      console.error('     ⚠️  Failed to update reputation:', error)
+    }
   }
 
-  async logAction(action: string, credentialId: number, details: string) {
-    await supabase
+  async logAction(action: string, credentialId: string, details: string) {
+    const { error } = await supabase
       .from('agent_actions')
-      .insert({ action, credential_id: credentialId, details, timestamp: new Date().toISOString() })
+      .insert({ 
+        action, 
+        credential_id: credentialId, 
+        details, 
+        timestamp: new Date().toISOString() 
+      })
+
+    if (error) {
+      console.error('     ⚠️  Failed to log action:', error)
+    }
   }
 
   private calculateDuration(startDate: string, endDate: string | null): number {
@@ -208,6 +253,7 @@ Respond with JSON:
 
   stop() {
     this.running = false
+    console.log('🛑 Agent stopped')
   }
 }
 
