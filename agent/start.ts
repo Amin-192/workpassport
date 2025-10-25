@@ -1,4 +1,8 @@
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { resolve } from 'path'
+
+config({ path: resolve(process.cwd(), '.env.local') })
+
 import { agent } from './credential-monitor'
 import { companyVerifier } from './company-verifier'
 

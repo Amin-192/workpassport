@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WorkPassport
+
+Verifiable work credentials with instant PYUSD payments for remote workers across borders.
+
+Built for ETHGlobal ETHOnline 2025.
+
+## The Problem
+
+Remote workers struggle to prove their work history when applying across borders. Employers can't verify credentials. Cross-border payments take days and cost fees.
+
+## The Solution
+
+WorkPassport provides cryptographically signed work credentials stored on-chain with instant PYUSD payment settlements through smart contract escrow.
+
+## Features
+
+**For Employers:**
+- AI-powered company verification system
+- Issue EIP-712 signed credentials to workers
+- Lock PYUSD payments in trustless escrow
+- Real-time verification badges
+
+**For Workers:**
+- Collect verifiable on-chain credentials
+- Claim PYUSD payments instantly
+- Connect GitHub for contribution tracking
+- Private salary encryption via Lit Protocol
+
+**Autonomous AI Agents:**
+- Company Verifier Agent validates employer legitimacy every 15 seconds
+- Credential Monitor Agent detects fraud patterns every 30 seconds
+
+## Tech Stack
+
+- Next.js 15 + TypeScript
+- Ethereum Sepolia
+- Solidity Smart Contracts
+- PayPal USD (PYUSD)
+- Blockscout SDK
+- OpenAI GPT-4o-mini
+- Lit Protocol
+- Supabase
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+
+- MetaMask wallet
+- Sepolia testnet ETH
 
+### Installation
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create `.env.local`:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
+OPENAI_API_KEY=your_openai_key
+NEXT_PUBLIC_RPC_URL=your_rpc_url
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Run
+```bash
+# Start web application
+npm run dev
 
-## Learn More
+# Start AI agents (separate terminal)
+npm run agent
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open http://localhost:3000
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## How It Works
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Employers submit company details for AI verification
+2. Verified employers issue EIP-712 signed credentials
+3. Optional PYUSD payment locked in escrow contract
+4. Workers claim credentials and payments on-chain
+5. AI agents continuously monitor for fraud
 
-## Deploy on Vercel
+## Smart Contracts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Deployed on Ethereum Sepolia testnet.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Team
+
+Amin Hassan and Even Russom
+
+## License
+
+MIT
