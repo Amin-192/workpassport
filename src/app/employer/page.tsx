@@ -29,6 +29,31 @@ export default function EmployerPage() {
   useEffect(() => {
     if (address) {
       checkVerification()
+      
+      // Subscribe to verification changes
+      const subscription = supabase
+        .channel('employer_verification_updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'company_verifications',
+            filter: `employer_address=eq.${address.toLowerCase()}`
+          },
+          (payload) => {
+            if (payload.new.status === 'verified') {
+              setIsVerified(true)
+            } else {
+              setIsVerified(false)
+            }
+          }
+        )
+        .subscribe()
+
+      return () => {
+        subscription.unsubscribe()
+      }
     }
   }, [address])
 
