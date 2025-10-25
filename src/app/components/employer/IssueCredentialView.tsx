@@ -4,8 +4,9 @@ import { ethers } from 'ethers'
 import { supabase } from '@/lib/supabase'
 import { CONTRACT_ADDRESS, CONTRACT_ABI, ESCROW_ADDRESS, ESCROW_ABI, PYUSD_ADDRESS, PYUSD_ABI } from '@/lib/contract'
 import { CREDENTIAL_TYPES, DOMAIN, createCredentialMessage } from '@/lib/eip712'
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { CheckCircle2, Loader2, ExternalLink } from 'lucide-react'
 import { encryptCredentialField } from '@/lib/litEncryption'
+import { useNotification } from '@blockscout/app-sdk'
 
 interface IssueCredentialViewProps {
   issuerAddress: string
@@ -13,6 +14,7 @@ interface IssueCredentialViewProps {
 }
 
 export default function IssueCredentialView({ issuerAddress, onCredentialIssued }: IssueCredentialViewProps) {
+  const { openTxToast } = useNotification()
   const [formData, setFormData] = useState({
     workerAddress: '',
     position: '',
@@ -46,7 +48,6 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
         setFormData(prev => ({ ...prev, company: data.company_name }))
       }
     } catch (error) {
-      // No verified company
     }
   }
 
@@ -96,6 +97,9 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
       setStatus('Storing credential on blockchain...')
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer)
       const tx = await contract.issueCredential(formData.workerAddress, credentialHash)
+      
+      openTxToast("11155111", tx.hash)
+      
       await tx.wait()
       setTxHash(tx.hash)
 
@@ -107,6 +111,9 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
         setStatus('Approving PYUSD...')
         const pyusd = new ethers.Contract(PYUSD_ADDRESS, PYUSD_ABI, signer)
         const approveTx = await pyusd.approve(ESCROW_ADDRESS, amount)
+        
+        openTxToast("11155111", approveTx.hash)
+        
         await approveTx.wait()
         
         setStatus('Depositing to escrow...')
@@ -116,6 +123,9 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
           credentialHash,
           amount
         )
+        
+        openTxToast("11155111", depositTx.hash)
+        
         await depositTx.wait()
       }
 
@@ -175,14 +185,24 @@ export default function IssueCredentialView({ issuerAddress, onCredentialIssued 
             <CheckCircle2 className="w-5 h-5 text-green-500" />
             <p className="text-sm font-medium text-green-500">Transaction successful!</p>
           </div>
-          <a 
-            href={`https://sepolia.etherscan.io/tx/${txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-text-secondary hover:text-text-primary underline"
-          >
-            View on Etherscan →
-          </a>
+          <div className="flex gap-4 text-sm">
+            <a 
+              href={`https://eth-sepolia.blockscout.com/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-secondary hover:text-text-primary underline flex items-center gap-1"
+            >
+              View Transaction <ExternalLink className="w-3 h-3" />
+            </a>
+            <a 
+              href={`https://eth-sepolia.blockscout.com/address/${ESCROW_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-text-secondary hover:text-text-primary underline flex items-center gap-1"
+            >
+              View Escrow Contract <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </div>
       )}
 
