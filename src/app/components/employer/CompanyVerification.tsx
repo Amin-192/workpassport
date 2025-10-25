@@ -46,12 +46,10 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
           filter: `employer_address=eq.${employerAddress.toLowerCase()}`
         },
         (payload) => {
-          console.log('Verification updated:', payload)
+          console.log('Verification updated via realtime:', payload)
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             setVerification(payload.new as Verification)
             setShowForm(false)
-            
-            // Dispatch custom event to notify parent component
             window.dispatchEvent(new CustomEvent('companyVerificationUpdated'))
           }
         }
@@ -62,6 +60,26 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
       subscription.unsubscribe()
     }
   }, [employerAddress])
+
+  // Separate useEffect for polling ONLY when pending
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null
+    
+    if (verification?.status === 'pending') {
+      console.log('Starting polling for pending verification')
+      pollInterval = setInterval(() => {
+        console.log('Polling verification status...')
+        checkVerificationStatus(true)
+      }, 10000)
+    }
+
+    return () => {
+      if (pollInterval) {
+        console.log('Stopping polling')
+        clearInterval(pollInterval)
+      }
+    }
+  }, [verification?.status])
 
   const checkVerificationStatus = async (silent = false) => {
     if (!silent) {
@@ -79,6 +97,11 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
 
       if (data) {
         setVerification(data)
+        
+        // If status changed from pending, notify parent
+        if (data.status !== 'pending') {
+          window.dispatchEvent(new CustomEvent('companyVerificationUpdated'))
+        }
       } else {
         setVerification(null)
       }
@@ -199,25 +222,17 @@ export default function CompanyVerification({ employerAddress }: CompanyVerifica
       <div className="max-w-3xl">
         <NotificationBanner />
         <div className="border border-yellow-500/50 rounded-xl p-6 bg-yellow-500/5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Clock className="w-6 h-6 text-yellow-500 animate-pulse" />
-              <div>
-                <h3 className="text-lg font-semibold">AI Verification in Progress...</h3>
-                <p className="text-sm text-text-secondary">
-                  {verification.company_name} • Submitted {new Date(verification.created_at).toLocaleDateString()}
-                </p>
-              </div>
+          <div className="flex items-center gap-3 mb-4">
+            <Clock className="w-6 h-6 text-yellow-500 animate-pulse" />
+            <div>
+              <h3 className="text-lg font-semibold">AI Verification in Progress...</h3>
+              <p className="text-sm text-text-secondary">
+                {verification.company_name} • Submitted {new Date(verification.created_at).toLocaleDateString()}
+              </p>
             </div>
-            <button
-              onClick={() => checkVerificationStatus()}
-              className="px-4 py-2 text-sm border border-yellow-500/50 rounded-lg hover:bg-yellow-500/10 transition-colors"
-            >
-              Check Status
-            </button>
           </div>
           <div className="text-sm text-text-secondary mb-3">
-            Our AI agent is verifying your company details. This usually takes 15-30 seconds.
+            Our AI agent is verifying your company details. This usually takes 15-30 seconds. Status will update automatically.
           </div>
           <div className="flex items-center gap-2 text-xs text-yellow-500">
             <Loader2 className="w-4 h-4 animate-spin" />
