@@ -26,36 +26,37 @@ export default function EmployerPage() {
     checkExistingConnection()
   }, [router])
 
-  useEffect(() => {
-    if (address) {
-      checkVerification()
-      
-      // Subscribe to verification changes
-      const subscription = supabase
-        .channel('employer_verification_updates')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'company_verifications',
-            filter: `employer_address=eq.${address.toLowerCase()}`
-          },
-          (payload) => {
-            if (payload.new.status === 'verified') {
-              setIsVerified(true)
-            } else {
-              setIsVerified(false)
-            }
-          }
-        )
-        .subscribe()
+useEffect(() => {
+  if (address) {
+    checkVerification()
+    
+    const subscription = supabase
+      .channel('employer_verification_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'company_verifications',
+          filter: `employer_address=eq.${address.toLowerCase()}`
+        },
+        (payload) => {
+          console.log('🔔 Employer page: verification updated', payload.new)
+          checkVerification()
+        }
+      )
+      .subscribe()
 
-      return () => {
-        subscription.unsubscribe()
-      }
+    const pollInterval = setInterval(() => {
+      checkVerification()
+    }, 10000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearInterval(pollInterval)
     }
-  }, [address])
+  }
+}, [address])
 
   const checkExistingConnection = async () => {
     const hasDisconnected = sessionStorage.getItem('wallet_disconnected')
